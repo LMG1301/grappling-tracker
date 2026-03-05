@@ -110,7 +110,7 @@ export default function Layout() {
       )}
 
       {/* Bottom nav */}
-      <nav className="bg-dojo-surface border-t border-dojo-border px-4 py-2 flex items-center justify-around flex-shrink-0 safe-bottom">
+      <nav className="bg-dojo-surface border-t border-dojo-border px-4 pt-2 pb-2 flex items-end justify-around flex-shrink-0 safe-bottom relative">
         <button
           onClick={() => setView('map')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
@@ -131,12 +131,14 @@ export default function Layout() {
           <span className="text-xs">Liste</span>
         </button>
 
-        <button
-          onClick={() => { setShowForm(true); setEditingTechnique(null) }}
-          className="w-14 h-14 -mt-6 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white"
-        >
-          <Plus className="w-7 h-7" />
-        </button>
+        <div className="relative -top-5 flex flex-col items-center">
+          <button
+            onClick={() => { setShowForm(true); setEditingTechnique(null) }}
+            className="w-14 h-14 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white"
+          >
+            <Plus className="w-7 h-7" />
+          </button>
+        </div>
 
         <button
           onClick={() => setView('journal')}

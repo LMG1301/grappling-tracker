@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, ArrowUpDown } from 'lucide-react'
 import { ACTION_TYPES, ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../config/constants'
 
 function getYouTubeId(url) {
@@ -22,6 +22,7 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
   const [search, setSearch] = useState('')
   const [filterAction, setFilterAction] = useState('')
   const [filterPosition, setFilterPosition] = useState('')
+  const [sortBy, setSortBy] = useState('name')
 
   const positions = useMemo(
     () => [...new Set(techniques.map((t) => t.position))].sort(),
@@ -29,13 +30,33 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
   )
 
   const filtered = useMemo(() => {
-    return techniques.filter((t) => {
+    const list = techniques.filter((t) => {
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false
       if (filterAction && t.action_type !== filterAction) return false
       if (filterPosition && t.position !== filterPosition) return false
       return true
     })
-  }, [techniques, search, filterAction, filterPosition])
+
+    if (sortBy === 'date_desc') {
+      list.sort((a, b) => {
+        if (!a.learned_date && !b.learned_date) return 0
+        if (!a.learned_date) return 1
+        if (!b.learned_date) return -1
+        return b.learned_date.localeCompare(a.learned_date)
+      })
+    } else if (sortBy === 'date_asc') {
+      list.sort((a, b) => {
+        if (!a.learned_date && !b.learned_date) return 0
+        if (!a.learned_date) return 1
+        if (!b.learned_date) return -1
+        return a.learned_date.localeCompare(b.learned_date)
+      })
+    } else {
+      list.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return list
+  }, [techniques, search, filterAction, filterPosition, sortBy])
 
   return (
     <div className="flex-1 flex flex-col">
@@ -71,6 +92,19 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
             {positions.map((p) => (
               <option key={p} value={p}>{p}</option>
             ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <ArrowUpDown className="w-4 h-4 text-dojo-muted flex-shrink-0" />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="flex-1 bg-dojo-surface border border-dojo-border rounded-lg px-3 py-2 text-sm text-dojo-text appearance-none focus:outline-none focus:border-dojo-accent"
+          >
+            <option value="name">Trier par nom</option>
+            <option value="date_desc">Date (recent → ancien)</option>
+            <option value="date_asc">Date (ancien → recent)</option>
           </select>
         </div>
       </div>
