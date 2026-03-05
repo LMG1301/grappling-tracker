@@ -10,12 +10,14 @@ const NODE_STYLE_BASE = {
   padding: '10px 16px',
   borderRadius: 12,
   fontSize: 13,
+  fontFamily: "'Montserrat', system-ui, sans-serif",
   fontWeight: 600,
   cursor: 'pointer',
   border: '2px solid',
   textAlign: 'center',
   maxWidth: 200,
   lineHeight: 1.3,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
 }
 
 // Build the full tree structure (nodes + edges + parent/children relationships)
@@ -30,7 +32,7 @@ function buildFullTree(techniques, mode) {
   nodes.push({
     id: rootId,
     position: { x: 0, y: 0 },
-    data: { label: `Mes Techniques (${techniques.length})`, collapsible: true },
+    data: { label: `🥋 Mes Techniques (${techniques.length})`, collapsible: true },
     style: {
       ...NODE_STYLE_BASE,
       background: '#6366f1',
@@ -59,7 +61,7 @@ function buildFullTree(techniques, mode) {
         id: posId,
         position: { x: 0, y: 0 },
         data: { label: `${pos} (${posCount})`, collapsible: true },
-        style: { ...NODE_STYLE_BASE, background: '#1e2a4a', borderColor: '#3b5998', color: '#e2e8f0' },
+        style: { ...NODE_STYLE_BASE, background: '#f1f5f9', borderColor: '#cbd5e1', color: '#334155' },
       })
       edges.push({ id: `root-${posId}`, source: rootId, target: posId, type: 'smoothstep' })
 
@@ -87,7 +89,7 @@ function buildFullTree(techniques, mode) {
             id: techId,
             position: { x: 0, y: 0 },
             data: { label: tech.name, technique: tech, collapsible: false },
-            style: { ...NODE_STYLE_BASE, background: '#16213e', borderColor: color + '66', color: '#e2e8f0', fontSize: 12, fontWeight: 500 },
+            style: { ...NODE_STYLE_BASE, background: '#ffffff', borderColor: color + '44', color: '#334155', fontSize: 12, fontWeight: 500 },
           })
           edges.push({ id: `${actionId}-${techId}`, source: actionId, target: techId, type: 'smoothstep' })
         })
@@ -129,7 +131,7 @@ function buildFullTree(techniques, mode) {
           id: posId,
           position: { x: 0, y: 0 },
           data: { label: `${pos} (${techs.length})`, collapsible: true },
-          style: { ...NODE_STYLE_BASE, background: '#1e2a4a', borderColor: '#3b5998', color: '#e2e8f0' },
+          style: { ...NODE_STYLE_BASE, background: '#f1f5f9', borderColor: '#cbd5e1', color: '#334155' },
         })
         edges.push({ id: `${actionId}-${posId}`, source: actionId, target: posId, type: 'smoothstep' })
 
@@ -141,7 +143,7 @@ function buildFullTree(techniques, mode) {
             id: techId,
             position: { x: 0, y: 0 },
             data: { label: tech.name, technique: tech, collapsible: false },
-            style: { ...NODE_STYLE_BASE, background: '#16213e', borderColor: color + '66', color: '#e2e8f0', fontSize: 12, fontWeight: 500 },
+            style: { ...NODE_STYLE_BASE, background: '#ffffff', borderColor: color + '44', color: '#334155', fontSize: 12, fontWeight: 500 },
           })
           edges.push({ id: `${posId}-${techId}`, source: posId, target: techId, type: 'smoothstep' })
         })
@@ -348,7 +350,7 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background color="#2a3a5c" gap={20} />
+          <Background color="#e2e8f0" gap={20} />
           <Controls />
         </ReactFlow>
       </div>

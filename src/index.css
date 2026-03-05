@@ -2,12 +2,12 @@
 @import "@xyflow/react/dist/style.css";
 
 @theme {
-  --color-dojo-bg: #1a1a2e;
-  --color-dojo-surface: #16213e;
-  --color-dojo-card: #1e2a4a;
-  --color-dojo-border: #2a3a5c;
-  --color-dojo-text: #e2e8f0;
-  --color-dojo-muted: #94a3b8;
+  --color-dojo-bg: #ffffff;
+  --color-dojo-surface: #f8fafc;
+  --color-dojo-card: #f1f5f9;
+  --color-dojo-border: #e2e8f0;
+  --color-dojo-text: #1e293b;
+  --color-dojo-muted: #64748b;
   --color-dojo-accent: #6366f1;
   --color-dojo-accent-hover: #818cf8;
 
@@ -17,13 +17,15 @@
   --color-type-escape: #eab308;
   --color-type-transition: #a855f7;
   --color-type-takedown: #f97316;
+
+  --font-sans: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 body {
   margin: 0;
   background-color: var(--color-dojo-bg);
   color: var(--color-dojo-text);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   min-height: 100dvh;
 }
 
@@ -33,24 +35,24 @@ body {
   flex-direction: column;
 }
 
-/* React Flow dark theme overrides */
+/* React Flow light theme overrides */
 .react-flow__background {
-  background-color: var(--color-dojo-bg) !important;
+  background-color: #fafbfc !important;
 }
 .react-flow__minimap {
   background-color: var(--color-dojo-surface) !important;
 }
 .react-flow__controls button {
-  background-color: var(--color-dojo-card) !important;
+  background-color: #fff !important;
   border-color: var(--color-dojo-border) !important;
   color: var(--color-dojo-text) !important;
   fill: var(--color-dojo-text) !important;
 }
 .react-flow__controls button:hover {
-  background-color: var(--color-dojo-border) !important;
+  background-color: var(--color-dojo-card) !important;
 }
 .react-flow__edge-path {
-  stroke: var(--color-dojo-border) !important;
+  stroke: #cbd5e1 !important;
   stroke-width: 2 !important;
 }
 

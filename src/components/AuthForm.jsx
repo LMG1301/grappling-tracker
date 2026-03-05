@@ -35,9 +35,7 @@ export default function AuthForm() {
     <div className="min-h-dvh flex items-center justify-center px-4 bg-dojo-bg">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-dojo-accent/20 flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-dojo-accent" />
-          </div>
+          <div className="text-5xl mb-4">🥋</div>
           <h1 className="text-2xl font-bold text-dojo-text">Grappling Tracker</h1>
           <p className="text-dojo-muted text-sm mt-1">Suivi de techniques BJJ</p>
         </div>

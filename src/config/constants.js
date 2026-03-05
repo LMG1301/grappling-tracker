@@ -1,10 +1,10 @@
 export const ACTION_TYPES = [
-  { value: 'submission', label: 'Submission', color: '#ef4444' },
-  { value: 'sweep', label: 'Sweep', color: '#3b82f6' },
-  { value: 'pass', label: 'Pass', color: '#22c55e' },
-  { value: 'escape', label: 'Escape', color: '#eab308' },
-  { value: 'transition', label: 'Transition', color: '#a855f7' },
-  { value: 'takedown', label: 'Takedown', color: '#f97316' },
+  { value: 'submission', label: '🔒 Submission', color: '#ef4444' },
+  { value: 'sweep', label: '🔄 Sweep', color: '#3b82f6' },
+  { value: 'pass', label: '🚀 Pass', color: '#22c55e' },
+  { value: 'escape', label: '💨 Escape', color: '#eab308' },
+  { value: 'transition', label: '🔀 Transition', color: '#a855f7' },
+  { value: 'takedown', label: '⬇️ Takedown', color: '#f97316' },
 ]
 
 export const DEFAULT_POSITIONS = [
