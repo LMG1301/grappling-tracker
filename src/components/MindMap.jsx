@@ -7,17 +7,21 @@ import {
 import { ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../config/constants'
 
 const NODE_STYLE_BASE = {
-  padding: '10px 18px',
+  padding: '10px 16px',
   borderRadius: 24,
-  fontSize: 13,
+  fontSize: 12,
   fontFamily: "'Montserrat', system-ui, sans-serif",
   fontWeight: 600,
   cursor: 'pointer',
   border: '2px solid',
   textAlign: 'center',
-  maxWidth: 180,
+  width: 'auto',
+  minWidth: 80,
+  maxWidth: 200,
   lineHeight: 1.3,
   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 }
 
@@ -38,9 +42,10 @@ function buildFullTree(techniques, mode) {
       background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
       borderColor: '#818cf8',
       color: '#fff',
-      fontSize: 16,
-      padding: '14px 24px',
+      fontSize: 14,
+      padding: '12px 20px',
       borderRadius: 32,
+      maxWidth: 260,
       boxShadow: '0 4px 20px rgba(99,102,241,0.3)',
     },
   })
@@ -105,9 +110,8 @@ function buildFullTree(techniques, mode) {
               color: '#475569',
               fontSize: 11,
               fontWeight: 500,
-              padding: '8px 14px',
-              whiteSpace: 'normal',
-              maxWidth: 160,
+              padding: '7px 12px',
+              maxWidth: 150,
             },
           })
           edges.push({ id: `${actionId}-${techId}`, source: actionId, target: techId, type: 'default', style: { stroke: color + '33', strokeWidth: 1.5 } })
@@ -174,9 +178,8 @@ function buildFullTree(techniques, mode) {
               color: '#475569',
               fontSize: 11,
               fontWeight: 500,
-              padding: '8px 14px',
-              whiteSpace: 'normal',
-              maxWidth: 160,
+              padding: '7px 12px',
+              maxWidth: 150,
             },
           })
           edges.push({ id: `${posId}-${techId}`, source: posId, target: techId, type: 'default', style: { stroke: color + '33', strokeWidth: 1.5 } })
