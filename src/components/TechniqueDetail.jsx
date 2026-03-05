@@ -1,4 +1,4 @@
-import { X, ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { X, ExternalLink, Pencil, Trash2, Calendar } from 'lucide-react'
 import { ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../config/constants'
 
 function getYouTubeId(url) {
@@ -55,6 +55,12 @@ export default function TechniqueDetail({ technique, imageUrl, onClose, onEdit, 
             <span className="px-3 py-1 rounded-full text-sm font-medium bg-dojo-card text-dojo-text border border-dojo-border">
               {technique.position}
             </span>
+            {technique.learned_date && (
+              <span className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-dojo-card text-dojo-muted border border-dojo-border">
+                <Calendar className="w-3.5 h-3.5" />
+                {new Date(technique.learned_date).toLocaleDateString('fr-FR')}
+              </span>
+            )}
           </div>
 
           {ytId && (

@@ -1,17 +1,20 @@
 import { useState } from 'react'
-import { Map, List, Plus, LogOut } from 'lucide-react'
+import { Map, List, Plus, LogOut, BookOpen } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useTechniques } from '../hooks/useTechniques'
 import { usePositions } from '../hooks/usePositions'
+import { useJournal } from '../hooks/useJournal'
 import MindMap from './MindMap'
 import TechniqueList from './TechniqueList'
 import TechniqueForm from './TechniqueForm'
 import TechniqueDetail from './TechniqueDetail'
+import JournalPage from './JournalPage'
 
 export default function Layout() {
   const { signOut } = useAuth()
   const { techniques, addTechnique, updateTechnique, deleteTechnique, uploadImage, getImageUrl } = useTechniques()
   const { positions, addPosition } = usePositions()
+  const { entries: journalEntries, addEntry, updateEntry, deleteEntry } = useJournal()
 
   const [view, setView] = useState('map')
   const [mindMapMode, setMindMapMode] = useState('position')
@@ -91,16 +94,23 @@ export default function Layout() {
           mode={mindMapMode}
           onSelectTechnique={setSelectedTechnique}
         />
-      ) : (
+      ) : view === 'list' ? (
         <TechniqueList
           techniques={techniques}
           getImageUrl={getImageUrl}
           onSelect={setSelectedTechnique}
         />
+      ) : (
+        <JournalPage
+          entries={journalEntries}
+          onAdd={addEntry}
+          onUpdate={updateEntry}
+          onDelete={deleteEntry}
+        />
       )}
 
       {/* Bottom nav */}
-      <nav className="bg-dojo-surface border-t border-dojo-border px-6 py-2 flex items-center justify-around flex-shrink-0 safe-bottom">
+      <nav className="bg-dojo-surface border-t border-dojo-border px-4 py-2 flex items-center justify-around flex-shrink-0 safe-bottom">
         <button
           onClick={() => setView('map')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
@@ -112,13 +122,6 @@ export default function Layout() {
         </button>
 
         <button
-          onClick={() => { setShowForm(true); setEditingTechnique(null) }}
-          className="w-14 h-14 -mt-6 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white"
-        >
-          <Plus className="w-7 h-7" />
-        </button>
-
-        <button
           onClick={() => setView('list')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
             view === 'list' ? 'text-dojo-accent' : 'text-dojo-muted'
@@ -126,6 +129,23 @@ export default function Layout() {
         >
           <List className="w-5 h-5" />
           <span className="text-xs">Liste</span>
+        </button>
+
+        <button
+          onClick={() => { setShowForm(true); setEditingTechnique(null) }}
+          className="w-14 h-14 -mt-6 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+
+        <button
+          onClick={() => setView('journal')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
+            view === 'journal' ? 'text-dojo-accent' : 'text-dojo-muted'
+          }`}
+        >
+          <BookOpen className="w-5 h-5" />
+          <span className="text-xs">Journal</span>
         </button>
       </nav>
 

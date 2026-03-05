@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, Camera, Plus } from 'lucide-react'
+import { X, Camera, Plus, Calendar } from 'lucide-react'
 import { ACTION_TYPES, MAX_IMAGE_SIZE, ACCEPTED_IMAGE_TYPES } from '../config/constants'
 
 export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosition, initialData }) {
@@ -8,6 +8,7 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
   const [actionType, setActionType] = useState(initialData?.action_type || 'submission')
   const [videoUrl, setVideoUrl] = useState(initialData?.video_url || '')
   const [notes, setNotes] = useState(initialData?.notes || '')
+  const [learnedDate, setLearnedDate] = useState(initialData?.learned_date || '')
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
   const [newPosition, setNewPosition] = useState('')
@@ -49,7 +50,7 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
     setSubmitting(true)
     setError('')
     try {
-      await onSubmit({ name: name.trim(), position, action_type: actionType, video_url: videoUrl || null, notes: notes || null }, imageFile)
+      await onSubmit({ name: name.trim(), position, action_type: actionType, video_url: videoUrl || null, notes: notes || null, learned_date: learnedDate || null }, imageFile)
       onClose()
     } catch (err) {
       setError(err.message)
@@ -190,6 +191,19 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
                 />
               </label>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm text-dojo-muted mb-1">Date d'apprentissage</label>
+            <div className="relative">
+              <input
+                type="date"
+                value={learnedDate}
+                onChange={(e) => setLearnedDate(e.target.value)}
+                className="w-full bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors"
+              />
+              <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dojo-muted pointer-events-none" />
+            </div>
           </div>
 
           <div>
