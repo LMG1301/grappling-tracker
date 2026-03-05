@@ -101,7 +101,7 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-dojo-text font-medium truncate">{t.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span
                       className="text-xs px-2 py-0.5 rounded-full text-white"
                       style={{ backgroundColor: ACTION_COLOR_MAP[t.action_type] }}
@@ -109,6 +109,11 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
                       {ACTION_LABEL_MAP[t.action_type]}
                     </span>
                     <span className="text-xs text-dojo-muted truncate">{t.position}</span>
+                    {t.learned_date && (
+                      <span className="text-xs text-dojo-muted">
+                        📅 {new Date(t.learned_date).toLocaleDateString('fr-FR')}
+                      </span>
+                    )}
                   </div>
                 </div>
               </button>
