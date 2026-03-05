@@ -7,24 +7,24 @@ import {
 import { ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../config/constants'
 
 const NODE_STYLE_BASE = {
-  padding: '10px 16px',
-  borderRadius: 12,
+  padding: '10px 18px',
+  borderRadius: 24,
   fontSize: 13,
   fontFamily: "'Montserrat', system-ui, sans-serif",
   fontWeight: 600,
   cursor: 'pointer',
   border: '2px solid',
   textAlign: 'center',
-  maxWidth: 200,
+  maxWidth: 180,
   lineHeight: 1.3,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+  whiteSpace: 'nowrap',
 }
 
-// Build the full tree structure (nodes + edges + parent/children relationships)
 function buildFullTree(techniques, mode) {
   const nodes = []
   const edges = []
-  const childrenMap = {} // parentId -> [childId, ...]
+  const childrenMap = {}
 
   const rootId = 'root'
   childrenMap[rootId] = []
@@ -35,10 +35,13 @@ function buildFullTree(techniques, mode) {
     data: { label: `🥋 Mes Techniques (${techniques.length})`, collapsible: true },
     style: {
       ...NODE_STYLE_BASE,
-      background: '#6366f1',
+      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
       borderColor: '#818cf8',
       color: '#fff',
-      fontSize: 15,
+      fontSize: 16,
+      padding: '14px 24px',
+      borderRadius: 32,
+      boxShadow: '0 4px 20px rgba(99,102,241,0.3)',
     },
   })
 
@@ -60,10 +63,16 @@ function buildFullTree(techniques, mode) {
       nodes.push({
         id: posId,
         position: { x: 0, y: 0 },
-        data: { label: `${pos} (${posCount})`, collapsible: true },
-        style: { ...NODE_STYLE_BASE, background: '#f1f5f9', borderColor: '#cbd5e1', color: '#334155' },
+        data: { label: `📍 ${pos} (${posCount})`, collapsible: true },
+        style: {
+          ...NODE_STYLE_BASE,
+          background: '#f8fafc',
+          borderColor: '#6366f1',
+          color: '#334155',
+          boxShadow: '0 2px 12px rgba(99,102,241,0.12)',
+        },
       })
-      edges.push({ id: `root-${posId}`, source: rootId, target: posId, type: 'smoothstep' })
+      edges.push({ id: `root-${posId}`, source: rootId, target: posId, type: 'default', style: { stroke: '#a5b4fc', strokeWidth: 2 } })
 
       const actionKeys = Object.keys(byPosition[pos]).sort()
       actionKeys.forEach((action) => {
@@ -77,9 +86,9 @@ function buildFullTree(techniques, mode) {
           id: actionId,
           position: { x: 0, y: 0 },
           data: { label: `${ACTION_LABEL_MAP[action]} (${techs.length})`, collapsible: true },
-          style: { ...NODE_STYLE_BASE, background: color + '22', borderColor: color, color: color },
+          style: { ...NODE_STYLE_BASE, background: color + '15', borderColor: color, color: color },
         })
-        edges.push({ id: `${posId}-${actionId}`, source: posId, target: actionId, type: 'smoothstep' })
+        edges.push({ id: `${posId}-${actionId}`, source: posId, target: actionId, type: 'default', style: { stroke: color + '66', strokeWidth: 2 } })
 
         techs.forEach((tech) => {
           const techId = `tech-${tech.id}`
@@ -89,14 +98,23 @@ function buildFullTree(techniques, mode) {
             id: techId,
             position: { x: 0, y: 0 },
             data: { label: tech.name, technique: tech, collapsible: false },
-            style: { ...NODE_STYLE_BASE, background: '#ffffff', borderColor: color + '44', color: '#334155', fontSize: 12, fontWeight: 500 },
+            style: {
+              ...NODE_STYLE_BASE,
+              background: '#ffffff',
+              borderColor: color + '40',
+              color: '#475569',
+              fontSize: 11,
+              fontWeight: 500,
+              padding: '8px 14px',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            },
           })
-          edges.push({ id: `${actionId}-${techId}`, source: actionId, target: techId, type: 'smoothstep' })
+          edges.push({ id: `${actionId}-${techId}`, source: actionId, target: techId, type: 'default', style: { stroke: color + '33', strokeWidth: 1.5 } })
         })
       })
     })
   } else {
-    // By action
     const byAction = {}
     techniques.forEach((t) => {
       if (!byAction[t.action_type]) byAction[t.action_type] = {}
@@ -116,9 +134,15 @@ function buildFullTree(techniques, mode) {
         id: actionId,
         position: { x: 0, y: 0 },
         data: { label: `${ACTION_LABEL_MAP[action]} (${count})`, collapsible: true },
-        style: { ...NODE_STYLE_BASE, background: color + '22', borderColor: color, color: color },
+        style: {
+          ...NODE_STYLE_BASE,
+          background: color + '15',
+          borderColor: color,
+          color: color,
+          boxShadow: `0 2px 12px ${color}20`,
+        },
       })
-      edges.push({ id: `root-${actionId}`, source: rootId, target: actionId, type: 'smoothstep' })
+      edges.push({ id: `root-${actionId}`, source: rootId, target: actionId, type: 'default', style: { stroke: color + '66', strokeWidth: 2 } })
 
       const posKeys = Object.keys(byAction[action]).sort()
       posKeys.forEach((pos, pi) => {
@@ -130,10 +154,10 @@ function buildFullTree(techniques, mode) {
         nodes.push({
           id: posId,
           position: { x: 0, y: 0 },
-          data: { label: `${pos} (${techs.length})`, collapsible: true },
-          style: { ...NODE_STYLE_BASE, background: '#f1f5f9', borderColor: '#cbd5e1', color: '#334155' },
+          data: { label: `📍 ${pos} (${techs.length})`, collapsible: true },
+          style: { ...NODE_STYLE_BASE, background: '#f8fafc', borderColor: color + '66', color: '#334155' },
         })
-        edges.push({ id: `${actionId}-${posId}`, source: actionId, target: posId, type: 'smoothstep' })
+        edges.push({ id: `${actionId}-${posId}`, source: actionId, target: posId, type: 'default', style: { stroke: color + '44', strokeWidth: 1.5 } })
 
         techs.forEach((tech) => {
           const techId = `tech-${tech.id}`
@@ -143,9 +167,19 @@ function buildFullTree(techniques, mode) {
             id: techId,
             position: { x: 0, y: 0 },
             data: { label: tech.name, technique: tech, collapsible: false },
-            style: { ...NODE_STYLE_BASE, background: '#ffffff', borderColor: color + '44', color: '#334155', fontSize: 12, fontWeight: 500 },
+            style: {
+              ...NODE_STYLE_BASE,
+              background: '#ffffff',
+              borderColor: color + '40',
+              color: '#475569',
+              fontSize: 11,
+              fontWeight: 500,
+              padding: '8px 14px',
+              whiteSpace: 'normal',
+              maxWidth: 160,
+            },
           })
-          edges.push({ id: `${posId}-${techId}`, source: posId, target: techId, type: 'smoothstep' })
+          edges.push({ id: `${posId}-${techId}`, source: posId, target: techId, type: 'default', style: { stroke: color + '33', strokeWidth: 1.5 } })
         })
       })
     })
@@ -154,7 +188,6 @@ function buildFullTree(techniques, mode) {
   return { nodes, edges, childrenMap }
 }
 
-// Get all descendant IDs of collapsed nodes (these will be hidden)
 function getHiddenIds(collapsed, childrenMap) {
   const hidden = new Set()
   function hideChildren(parentId) {
@@ -168,9 +201,8 @@ function getHiddenIds(collapsed, childrenMap) {
   return hidden
 }
 
-// Compute positions for visible nodes (tree layout)
-function layoutNodes(visibleNodes, visibleEdges) {
-  // Build adjacency from edges
+// Radial layout - places nodes in concentric circles around center
+function layoutRadial(visibleNodes, visibleEdges) {
   const childMap = {}
   const parentMap = {}
   visibleEdges.forEach((e) => {
@@ -179,11 +211,10 @@ function layoutNodes(visibleNodes, visibleEdges) {
     parentMap[e.target] = e.source
   })
 
-  // Find root
   const root = visibleNodes.find((n) => !parentMap[n.id])
   if (!root) return visibleNodes
 
-  // Calculate subtree sizes for spacing
+  // Calculate subtree leaf count for proportional angle allocation
   const subtreeSize = {}
   function calcSize(id) {
     const children = childMap[id] || []
@@ -198,38 +229,34 @@ function layoutNodes(visibleNodes, visibleEdges) {
   }
   calcSize(root.id)
 
-  // Assign positions
-  const xSpacing = 300
-  const ySpacing = 60
   const positions = {}
+  const radiusStep = 280
 
-  function assignPositions(id, depth, yStart) {
-    const children = childMap[id] || []
-    const totalSize = subtreeSize[id] || 1
+  function assignPositions(id, depth, angleStart, angleEnd) {
+    const radius = depth * radiusStep
+    const angleMid = (angleStart + angleEnd) / 2
 
-    if (children.length === 0) {
-      positions[id] = { x: depth * xSpacing, y: yStart }
-      return
+    positions[id] = {
+      x: Math.cos(angleMid) * radius,
+      y: Math.sin(angleMid) * radius,
     }
 
-    let currentY = yStart
+    const children = childMap[id] || []
+    if (children.length === 0) return
+
+    const totalSize = subtreeSize[id] || 1
+    let currentAngle = angleStart
+
     children.forEach((childId) => {
       const childSize = subtreeSize[childId] || 1
-      assignPositions(childId, depth + 1, currentY)
-      currentY += childSize * ySpacing
+      const childAngleSpan = ((angleEnd - angleStart) * childSize) / totalSize
+      assignPositions(childId, depth + 1, currentAngle, currentAngle + childAngleSpan)
+      currentAngle += childAngleSpan
     })
-
-    // Center parent vertically among its children
-    const firstChild = positions[children[0]]
-    const lastChild = positions[children[children.length - 1]]
-    positions[id] = {
-      x: depth * xSpacing,
-      y: (firstChild.y + lastChild.y) / 2,
-    }
   }
 
-  const totalHeight = (subtreeSize[root.id] || 1) * ySpacing
-  assignPositions(root.id, 0, -totalHeight / 2)
+  // Full circle layout
+  assignPositions(root.id, 0, 0, 2 * Math.PI)
 
   return visibleNodes.map((n) => ({
     ...n,
@@ -246,7 +273,6 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
   const [displayEdges, setDisplayEdges] = useState([])
   const reactFlowRef = useRef(null)
 
-  // Rebuild full tree when techniques or mode changes
   useEffect(() => {
     if (techniques.length === 0) {
       setAllNodes([])
@@ -259,14 +285,13 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
     setAllNodes(tree.nodes)
     setAllEdges(tree.edges)
     setChildrenMap(tree.childrenMap)
-    // Start with level 2+ collapsed (only root + first level visible)
+    // Start collapsed at level 1
     const initialCollapsed = new Set()
     const rootChildren = tree.childrenMap['root'] || []
     rootChildren.forEach((id) => initialCollapsed.add(id))
     setCollapsed(initialCollapsed)
   }, [techniques, mode])
 
-  // Filter visible nodes/edges based on collapsed state
   useEffect(() => {
     if (allNodes.length === 0) {
       setDisplayNodes([])
@@ -276,14 +301,13 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
 
     const hiddenIds = getHiddenIds(collapsed, childrenMap)
 
-    // Update labels to show +/- indicator
     const visibleNodes = allNodes
       .filter((n) => !hiddenIds.has(n.id))
       .map((n) => {
         if (!n.data.collapsible || !(childrenMap[n.id]?.length > 0)) return n
         const isCollapsed = collapsed.has(n.id)
-        const indicator = isCollapsed ? ' [+]' : ' [-]'
-        const baseLabel = n.data.label.replace(/ \[[\+\-]\]$/, '')
+        const indicator = isCollapsed ? ' ＋' : ' −'
+        const baseLabel = n.data.label.replace(/ [＋−]$/, '')
         return {
           ...n,
           data: { ...n.data, label: baseLabel + indicator },
@@ -295,20 +319,17 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
       (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)
     )
 
-    const laid = layoutNodes(visibleNodes, visibleEdges)
+    const laid = layoutRadial(visibleNodes, visibleEdges)
     setDisplayNodes(laid)
     setDisplayEdges(visibleEdges)
   }, [allNodes, allEdges, collapsed, childrenMap])
 
   const onNodeClick = useCallback(
     (_event, node) => {
-      // If it's a technique leaf node, show detail
       if (node.data?.technique) {
         onSelectTechnique(node.data.technique)
         return
       }
-
-      // If it's a collapsible branch node, toggle collapse
       if (node.data?.collapsible && childrenMap[node.id]?.length > 0) {
         setCollapsed((prev) => {
           const next = new Set(prev)
@@ -328,6 +349,7 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
     return (
       <div className="flex-1 flex items-center justify-center text-dojo-muted">
         <div className="text-center px-8">
+          <p className="text-4xl mb-4">🥋</p>
           <p className="text-xl mb-2">Aucune technique</p>
           <p className="text-sm">Ajoute ta premiere technique avec le bouton +</p>
         </div>
@@ -345,12 +367,12 @@ export default function MindMap({ techniques, mode, onSelectTechnique }) {
           onNodeClick={onNodeClick}
           fitView
           key={collapsed.size + '-' + displayNodes.length}
-          fitViewOptions={{ padding: 0.3 }}
-          minZoom={0.1}
+          fitViewOptions={{ padding: 0.4 }}
+          minZoom={0.05}
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
         >
-          <Background color="#e2e8f0" gap={20} />
+          <Background color="#e8ecf1" gap={24} size={1} />
           <Controls />
         </ReactFlow>
       </div>
