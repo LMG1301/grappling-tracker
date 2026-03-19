@@ -80,6 +80,36 @@ export function useTechniques() {
     return data.publicUrl
   }, [])
 
+  // Technique links
+  const fetchLinks = useCallback(async () => {
+    if (!user) return []
+    const { data, error } = await supabase
+      .from('technique_links')
+      .select('*')
+      .eq('user_id', user.id)
+    if (error) {
+      console.error('Error fetching links:', error)
+      return []
+    }
+    return data || []
+  }, [user])
+
+  const addLink = useCallback(async (sourceId, targetId) => {
+    if (!user) return null
+    const { data, error } = await supabase
+      .from('technique_links')
+      .insert({ user_id: user.id, source_id: sourceId, target_id: targetId })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }, [user])
+
+  const deleteLink = useCallback(async (id) => {
+    const { error } = await supabase.from('technique_links').delete().eq('id', id)
+    if (error) throw error
+  }, [])
+
   return {
     techniques,
     loading,
@@ -88,6 +118,9 @@ export function useTechniques() {
     deleteTechnique,
     uploadImage,
     getImageUrl,
+    fetchLinks,
+    addLink,
+    deleteLink,
     refresh: fetchTechniques,
   }
 }

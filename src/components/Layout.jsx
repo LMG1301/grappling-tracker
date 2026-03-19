@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Map, List, Plus, LogOut, BookOpen } from 'lucide-react'
+import { Map, List, Plus, LogOut, BookOpen, Bot } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useTechniques } from '../hooks/useTechniques'
 import { usePositions } from '../hooks/usePositions'
@@ -9,10 +9,11 @@ import TechniqueList from './TechniqueList'
 import TechniqueForm from './TechniqueForm'
 import TechniqueDetail from './TechniqueDetail'
 import JournalPage from './JournalPage'
+import CoachPage from './CoachPage'
 
 export default function Layout() {
   const { signOut } = useAuth()
-  const { techniques, addTechnique, updateTechnique, deleteTechnique, uploadImage, getImageUrl } = useTechniques()
+  const { techniques, addTechnique, updateTechnique, deleteTechnique, uploadImage, getImageUrl, fetchLinks } = useTechniques()
   const { positions, addPosition } = usePositions()
   const { entries: journalEntries, addEntry, updateEntry, deleteEntry } = useJournal()
 
@@ -100,17 +101,19 @@ export default function Layout() {
           getImageUrl={getImageUrl}
           onSelect={setSelectedTechnique}
         />
-      ) : (
+      ) : view === 'journal' ? (
         <JournalPage
           entries={journalEntries}
           onAdd={addEntry}
           onUpdate={updateEntry}
           onDelete={deleteEntry}
         />
+      ) : (
+        <CoachPage />
       )}
 
       {/* Bottom nav */}
-      <nav className="bg-dojo-surface border-t border-dojo-border px-4 pt-2 pb-2 flex items-end justify-around flex-shrink-0 safe-bottom relative">
+      <nav className="bg-dojo-surface border-t border-dojo-border px-2 pt-2 pb-2 flex items-end justify-around flex-shrink-0 safe-bottom relative">
         <button
           onClick={() => setView('map')}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
@@ -118,7 +121,7 @@ export default function Layout() {
           }`}
         >
           <Map className="w-5 h-5" />
-          <span className="text-xs">Mind Map</span>
+          <span className="text-[10px]">Mind Map</span>
         </button>
 
         <button
@@ -128,7 +131,7 @@ export default function Layout() {
           }`}
         >
           <List className="w-5 h-5" />
-          <span className="text-xs">Liste</span>
+          <span className="text-[10px]">Liste</span>
         </button>
 
         <div className="relative -top-5 flex flex-col items-center">
@@ -147,7 +150,17 @@ export default function Layout() {
           }`}
         >
           <BookOpen className="w-5 h-5" />
-          <span className="text-xs">Journal</span>
+          <span className="text-[10px]">Journal</span>
+        </button>
+
+        <button
+          onClick={() => setView('coach')}
+          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
+            view === 'coach' ? 'text-dojo-accent' : 'text-dojo-muted'
+          }`}
+        >
+          <Bot className="w-5 h-5" />
+          <span className="text-[10px]">Coach</span>
         </button>
       </nav>
 
@@ -155,6 +168,7 @@ export default function Layout() {
       {showForm && (
         <TechniqueForm
           positions={positions}
+          techniques={techniques}
           onSubmit={handleSubmit}
           onClose={handleCloseForm}
           onAddPosition={addPosition}
@@ -165,10 +179,13 @@ export default function Layout() {
       {selectedTechnique && (
         <TechniqueDetail
           technique={selectedTechnique}
+          techniques={techniques}
           imageUrl={getImageUrl(selectedTechnique.image_path)}
           onClose={() => setSelectedTechnique(null)}
           onEdit={handleEdit}
           onDelete={deleteTechnique}
+          onUpdateTechnique={updateTechnique}
+          fetchLinks={fetchLinks}
         />
       )}
     </div>

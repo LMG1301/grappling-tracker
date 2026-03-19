@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { Search, ArrowUpDown } from 'lucide-react'
-import { ACTION_TYPES, ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../config/constants'
+import { ACTION_TYPES, ACTION_COLOR_MAP, ACTION_LABEL_MAP, MATURITY_LEVELS, MATURITY_COLOR_MAP, MATURITY_LABEL_MAP } from '../config/constants'
 
 function getYouTubeId(url) {
   if (!url) return null
@@ -22,10 +22,16 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
   const [search, setSearch] = useState('')
   const [filterAction, setFilterAction] = useState('')
   const [filterPosition, setFilterPosition] = useState('')
+  const [filterMaturity, setFilterMaturity] = useState('')
   const [sortBy, setSortBy] = useState('name')
 
   const positions = useMemo(
     () => [...new Set(techniques.map((t) => t.position))].sort(),
+    [techniques]
+  )
+
+  const focusTechniques = useMemo(
+    () => techniques.filter((t) => t.is_focus),
     [techniques]
   )
 
@@ -34,6 +40,7 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false
       if (filterAction && t.action_type !== filterAction) return false
       if (filterPosition && t.position !== filterPosition) return false
+      if (filterMaturity && t.maturity !== filterMaturity) return false
       return true
     })
 
@@ -56,18 +63,39 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
     }
 
     return list
-  }, [techniques, search, filterAction, filterPosition, sortBy])
+  }, [techniques, search, filterAction, filterPosition, filterMaturity, sortBy])
 
   return (
     <div className="flex-1 flex flex-col">
       <div className="p-4 space-y-3">
+        {/* Focus section */}
+        {focusTechniques.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <h3 className="text-sm font-semibold text-amber-800 mb-2">
+              ★ Mon focus ({focusTechniques.length}/5)
+            </h3>
+            <div className="flex flex-wrap gap-1.5">
+              {focusTechniques.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => onSelect(t)}
+                  className="text-xs px-2.5 py-1 rounded-full text-white font-medium border-none cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ backgroundColor: ACTION_COLOR_MAP[t.action_type] }}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dojo-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="🔍 Rechercher une technique..."
+            placeholder="Rechercher une technique..."
             className="w-full bg-dojo-surface border border-dojo-border rounded-xl pl-10 pr-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors"
           />
         </div>
@@ -95,17 +123,29 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="w-4 h-4 text-dojo-muted flex-shrink-0" />
+        <div className="flex gap-2">
           <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+            value={filterMaturity}
+            onChange={(e) => setFilterMaturity(e.target.value)}
             className="flex-1 bg-dojo-surface border border-dojo-border rounded-lg px-3 py-2 text-sm text-dojo-text appearance-none focus:outline-none focus:border-dojo-accent"
           >
-            <option value="name">Trier par nom</option>
-            <option value="date_desc">Date (recent → ancien)</option>
-            <option value="date_asc">Date (ancien → recent)</option>
+            <option value="">Toutes maturites</option>
+            {MATURITY_LEVELS.map((m) => (
+              <option key={m.value} value={m.value}>{m.icon} {m.label}</option>
+            ))}
           </select>
+          <div className="flex items-center gap-2 flex-1">
+            <ArrowUpDown className="w-4 h-4 text-dojo-muted flex-shrink-0" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="flex-1 bg-dojo-surface border border-dojo-border rounded-lg px-3 py-2 text-sm text-dojo-text appearance-none focus:outline-none focus:border-dojo-accent"
+            >
+              <option value="name">Trier par nom</option>
+              <option value="date_desc">Date (recent)</option>
+              <option value="date_asc">Date (ancien)</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -134,14 +174,25 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-dojo-text font-medium truncate">{t.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-dojo-text font-medium truncate">
+                    {t.is_focus && <span className="text-amber-500 mr-1">★</span>}
+                    {t.name}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                     <span
                       className="text-xs px-2 py-0.5 rounded-full text-white"
                       style={{ backgroundColor: ACTION_COLOR_MAP[t.action_type] }}
                     >
                       {ACTION_LABEL_MAP[t.action_type]}
                     </span>
+                    {t.maturity && (
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full text-white"
+                        style={{ backgroundColor: MATURITY_COLOR_MAP[t.maturity] }}
+                      >
+                        {MATURITY_LABEL_MAP[t.maturity]}
+                      </span>
+                    )}
                     <span className="text-xs text-dojo-muted truncate">{t.position}</span>
                     {t.learned_date && (
                       <span className="text-xs text-dojo-muted">

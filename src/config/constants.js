@@ -5,7 +5,24 @@ export const ACTION_TYPES = [
   { value: 'escape', label: '💨 Escape', color: '#eab308' },
   { value: 'transition', label: '🔀 Transition', color: '#a855f7' },
   { value: 'takedown', label: '⬇️ Takedown', color: '#f97316' },
+  { value: 'principle', label: '🧠 Principle', color: '#6366f1' },
+  { value: 'drill', label: '🏋️ Drill', color: '#d97706' },
 ]
+
+export const MATURITY_LEVELS = [
+  { value: 'seen', label: 'Vu', color: '#94a3b8', icon: '👁' },
+  { value: 'drilled', label: 'Drill', color: '#f59e0b', icon: '🔄' },
+  { value: 'sparred', label: 'Spar', color: '#3b82f6', icon: '🥊' },
+  { value: 'reliable', label: 'Fiable', color: '#22c55e', icon: '✅' },
+]
+
+export const MATURITY_COLOR_MAP = Object.fromEntries(
+  MATURITY_LEVELS.map((m) => [m.value, m.color])
+)
+
+export const MATURITY_LABEL_MAP = Object.fromEntries(
+  MATURITY_LEVELS.map((m) => [m.value, m.label])
+)
 
 export const DEFAULT_POSITIONS = [
   'Closed Guard',

@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { X, Camera, Plus, Calendar } from 'lucide-react'
-import { ACTION_TYPES, MAX_IMAGE_SIZE, ACCEPTED_IMAGE_TYPES } from '../config/constants'
+import { ACTION_TYPES, MATURITY_LEVELS, MAX_IMAGE_SIZE, ACCEPTED_IMAGE_TYPES } from '../config/constants'
 
-export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosition, initialData }) {
+export default function TechniqueForm({ positions, techniques, onSubmit, onClose, onAddPosition, initialData }) {
   const [name, setName] = useState(initialData?.name || '')
   const [position, setPosition] = useState(initialData?.position || '')
   const [actionType, setActionType] = useState(initialData?.action_type || 'submission')
+  const [maturity, setMaturity] = useState(initialData?.maturity || 'seen')
+  const [isFocus, setIsFocus] = useState(initialData?.is_focus || false)
+  const [keyPoints, setKeyPoints] = useState(initialData?.key_points || '')
   const [videoUrl, setVideoUrl] = useState(initialData?.video_url || '')
   const [notes, setNotes] = useState(initialData?.notes || '')
   const [learnedDate, setLearnedDate] = useState(initialData?.learned_date || '')
@@ -15,6 +18,9 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
   const [showNewPosition, setShowNewPosition] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const focusCount = (techniques || []).filter((t) => t.is_focus && t.id !== initialData?.id).length
+  const canToggleFocus = isFocus || focusCount < 5
 
   function handleImageChange(e) {
     const file = e.target.files?.[0]
@@ -50,7 +56,17 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
     setSubmitting(true)
     setError('')
     try {
-      await onSubmit({ name: name.trim(), position, action_type: actionType, video_url: videoUrl || null, notes: notes || null, learned_date: learnedDate || null }, imageFile)
+      await onSubmit({
+        name: name.trim(),
+        position,
+        action_type: actionType,
+        maturity,
+        is_focus: isFocus,
+        key_points: keyPoints || null,
+        video_url: videoUrl || null,
+        notes: notes || null,
+        learned_date: learnedDate || null,
+      }, imageFile)
       onClose()
     } catch (err) {
       setError(err.message)
@@ -73,6 +89,21 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">{error}</div>
           )}
+
+          {/* Focus toggle */}
+          <label className="flex items-center gap-3 bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isFocus}
+              onChange={(e) => canToggleFocus && setIsFocus(e.target.checked)}
+              disabled={!canToggleFocus}
+              className="w-5 h-5 accent-amber-500"
+            />
+            <div>
+              <span className="text-sm font-medium text-dojo-text">★ En focus cette semaine</span>
+              <span className="text-xs text-dojo-muted ml-2">({focusCount}/5 actifs)</span>
+            </div>
+          </label>
 
           <div>
             <label className="block text-sm text-dojo-muted mb-1">Nom de la technique *</label>
@@ -131,13 +162,13 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
 
           <div>
             <label className="block text-sm text-dojo-muted mb-2">Type d'action *</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {ACTION_TYPES.map((type) => (
                 <button
                   key={type.value}
                   type="button"
                   onClick={() => setActionType(type.value)}
-                  className={`py-2.5 px-3 rounded-lg text-sm font-medium transition-all border ${
+                  className={`py-2 px-2 rounded-lg text-xs font-medium transition-all border ${
                     actionType === type.value
                       ? 'border-transparent text-white shadow-lg'
                       : 'border-dojo-border bg-dojo-bg text-dojo-muted hover:border-dojo-accent/50'
@@ -145,6 +176,28 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
                   style={actionType === type.value ? { backgroundColor: type.color } : {}}
                 >
                   {type.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Maturity */}
+          <div>
+            <label className="block text-sm text-dojo-muted mb-2">Maturite</label>
+            <div className="grid grid-cols-4 gap-2">
+              {MATURITY_LEVELS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMaturity(m.value)}
+                  className={`py-2 px-2 rounded-lg text-xs font-medium transition-all border ${
+                    maturity === m.value
+                      ? 'border-transparent text-white shadow-lg'
+                      : 'border-dojo-border bg-dojo-bg text-dojo-muted hover:border-dojo-accent/50'
+                  }`}
+                  style={maturity === m.value ? { backgroundColor: m.color } : {}}
+                >
+                  {m.icon} {m.label}
                 </button>
               ))}
             </div>
@@ -216,6 +269,20 @@ export default function TechniqueForm({ positions, onSubmit, onClose, onAddPosit
               className="w-full bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors resize-none"
             />
           </div>
+
+          {/* Key points - visible only for principle/drill */}
+          {(actionType === 'principle' || actionType === 'drill') && (
+            <div>
+              <label className="block text-sm text-dojo-muted mb-1">Points cles</label>
+              <textarea
+                value={keyPoints}
+                onChange={(e) => setKeyPoints(e.target.value)}
+                placeholder={"- Point 1\n- Point 2\n- Point 3"}
+                rows={6}
+                className="w-full bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors resize-none font-mono text-sm"
+              />
+            </div>
+          )}
 
           <button
             type="submit"
