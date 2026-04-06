@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Map, List, Plus, LogOut, BookOpen, Bot, Activity } from 'lucide-react'
+import { Layers, List, Plus, LogOut, BookOpen, Activity } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useTechniques } from '../hooks/useTechniques'
 import { usePositions } from '../hooks/usePositions'
 import { useJournal } from '../hooks/useJournal'
-import MindMap from './MindMap'
+import { useSrsDeck } from '../hooks/useSrsDeck'
 import TechniqueList from './TechniqueList'
 import TechniqueForm from './TechniqueForm'
 import TechniqueDetail from './TechniqueDetail'
@@ -13,23 +13,31 @@ import CoachPage from './CoachPage'
 import MobilityPage from './mobility/MobilityPage'
 import MobilitySession from './mobility/MobilitySession'
 import MobilityStats from './mobility/MobilityStats'
+import ReviewPage from './srs/ReviewPage'
+import ReviewSession from './srs/ReviewSession'
+import ReviewFeedback from './srs/ReviewFeedback'
+import ReviewDeck from './srs/ReviewDeck'
 
 export default function Layout() {
   const { signOut } = useAuth()
   const { techniques, addTechnique, updateTechnique, deleteTechnique, uploadImage, getImageUrl, fetchLinks } = useTechniques()
   const { positions, addPosition } = usePositions()
   const { entries: journalEntries, addEntry, updateEntry, deleteEntry } = useJournal()
+  const { dueCards } = useSrsDeck()
 
-  const [view, setView] = useState('map')
-  const [mindMapMode, setMindMapMode] = useState('position')
+  const [view, setView] = useState('review')
   const [showForm, setShowForm] = useState(false)
   const [editingTechnique, setEditingTechnique] = useState(null)
   const [selectedTechnique, setSelectedTechnique] = useState(null)
 
   // Mobility state
-  const [mobilitySubView, setMobilitySubView] = useState('home') // 'home' | 'session' | 'stats'
+  const [mobilitySubView, setMobilitySubView] = useState('home')
   const [mobilityRoutineType, setMobilityRoutineType] = useState(null)
   const competitionWeek = 1 // TODO: connect to global context when S&C tracker is integrated
+
+  // SRS Review state
+  const [reviewSubView, setReviewSubView] = useState('home') // 'home' | 'session' | 'feedback' | 'deck'
+  const [sessionDueCards, setSessionDueCards] = useState([])
 
   async function handleSubmit(data, imageFile) {
     let image_path = editingTechnique?.image_path || null
@@ -62,30 +70,6 @@ export default function Layout() {
       <header className="bg-dojo-surface border-b border-dojo-border px-4 py-3 flex items-center justify-between flex-shrink-0">
         <h1 className="text-lg font-bold text-dojo-text">Grappling Tracker</h1>
         <div className="flex items-center gap-2">
-          {view === 'map' && (
-            <div className="flex bg-dojo-bg rounded-lg border border-dojo-border overflow-hidden">
-              <button
-                onClick={() => setMindMapMode('position')}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors border-none ${
-                  mindMapMode === 'position'
-                    ? 'bg-dojo-accent text-white'
-                    : 'bg-transparent text-dojo-muted hover:text-dojo-text'
-                }`}
-              >
-                Position
-              </button>
-              <button
-                onClick={() => setMindMapMode('action')}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors border-none ${
-                  mindMapMode === 'action'
-                    ? 'bg-dojo-accent text-white'
-                    : 'bg-transparent text-dojo-muted hover:text-dojo-text'
-                }`}
-              >
-                Action
-              </button>
-            </div>
-          )}
           <button
             onClick={signOut}
             className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-muted"
@@ -97,12 +81,24 @@ export default function Layout() {
       </header>
 
       {/* Main content */}
-      {view === 'map' ? (
-        <MindMap
-          techniques={techniques}
-          mode={mindMapMode}
-          onSelectTechnique={setSelectedTechnique}
-        />
+      {view === 'review' ? (
+        reviewSubView === 'session' && sessionDueCards.length > 0 ? (
+          <ReviewSession
+            dueCards={sessionDueCards}
+            onBack={() => { setReviewSubView('home'); setSessionDueCards([]) }}
+            onFeedback={() => setReviewSubView('feedback')}
+          />
+        ) : reviewSubView === 'feedback' ? (
+          <ReviewFeedback onBack={() => setReviewSubView('home')} />
+        ) : reviewSubView === 'deck' ? (
+          <ReviewDeck onBack={() => setReviewSubView('home')} />
+        ) : (
+          <ReviewPage
+            onStartSession={(cards) => { setSessionDueCards(cards); setReviewSubView('session') }}
+            onOpenDeck={() => setReviewSubView('deck')}
+            onOpenFeedback={() => setReviewSubView('feedback')}
+          />
+        )
       ) : view === 'list' ? (
         <TechniqueList
           techniques={techniques}
@@ -139,13 +135,18 @@ export default function Layout() {
       {/* Bottom nav */}
       <nav className="bg-dojo-surface border-t border-dojo-border px-2 pt-2 pb-2 flex items-end justify-around flex-shrink-0 safe-bottom relative">
         <button
-          onClick={() => setView('map')}
-          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
-            view === 'map' ? 'text-dojo-accent' : 'text-dojo-muted'
+          onClick={() => { setView('review'); setReviewSubView('home'); setSessionDueCards([]) }}
+          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none relative ${
+            view === 'review' ? 'text-dojo-accent' : 'text-dojo-muted'
           }`}
         >
-          <Map className="w-5 h-5" />
-          <span className="text-[10px]">Mind Map</span>
+          <Layers className="w-5 h-5" />
+          <span className="text-[10px]">Review</span>
+          {dueCards.length > 0 && view !== 'review' && (
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+              {dueCards.length > 9 ? '9+' : dueCards.length}
+            </span>
+          )}
         </button>
 
         <button
