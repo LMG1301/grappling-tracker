@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Check, SkipForward, ChevronDown } from 'lucide-react'
+import { Check, SkipForward, ChevronDown, Youtube } from 'lucide-react'
 import HoldTimer from './HoldTimer'
 import BilateralToggle from './BilateralToggle'
 import PainSlider from './PainSlider'
@@ -115,7 +115,20 @@ export default function ExerciseRow({
               {/* Optional fields */}
               <div className="flex items-center justify-between">
                 <PainSlider value={exercise.painLevel} onChange={(v) => onPainLevel(index, v)} />
-                <CoachingNotes exercise={exercise} />
+                <div className="flex items-center gap-3">
+                  {exercise.video_search_term && (
+                    <a
+                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(exercise.video_search_term)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 transition-colors"
+                    >
+                      <Youtube className="w-4 h-4" />
+                      <span>Video</span>
+                    </a>
+                  )}
+                  <CoachingNotes exercise={exercise} />
+                </div>
               </div>
 
               {/* ROM note */}
