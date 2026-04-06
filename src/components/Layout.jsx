@@ -15,6 +15,7 @@ import MobilityStats from './mobility/MobilityStats'
 import ReviewPage from './srs/ReviewPage'
 import ReviewSession from './srs/ReviewSession'
 import ReviewFeedback from './srs/ReviewFeedback'
+import BrowseCards from './srs/BrowseCards'
 
 const TABS = [
   { id: 'review', label: 'Review' },
@@ -28,7 +29,7 @@ export default function Layout() {
   const { techniques, addTechnique, updateTechnique, deleteTechnique, uploadImage, getImageUrl, fetchLinks } = useTechniques()
   const { positions, addPosition } = usePositions()
   const { entries: journalEntries, addEntry, updateEntry, deleteEntry } = useJournal()
-  const { dueCards } = useSrsDeck()
+  const { dueCards, allSrsCards } = useSrsDeck()
 
   const [view, setView] = useState('review')
   const [showForm, setShowForm] = useState(false)
@@ -120,10 +121,17 @@ export default function Layout() {
           />
         ) : reviewSubView === 'feedback' ? (
           <ReviewFeedback onBack={() => setReviewSubView('home')} />
+        ) : reviewSubView === 'browse' ? (
+          <BrowseCards
+            cards={allSrsCards}
+            getImageUrl={getImageUrl}
+            onBack={() => setReviewSubView('home')}
+          />
         ) : (
           <ReviewPage
             onStartSession={(cards) => { setSessionDueCards(cards); setReviewSubView('session') }}
             onOpenFeedback={() => setReviewSubView('feedback')}
+            onOpenBrowse={() => setReviewSubView('browse')}
           />
         )
       ) : view === 'techniques' ? (

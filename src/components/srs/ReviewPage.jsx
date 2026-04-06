@@ -3,7 +3,7 @@ import { useSrsDeck } from '../../hooks/useSrsDeck'
 import { useSrsStats } from '../../hooks/useSrsStats'
 import XpBar from './XpBar'
 
-export default function ReviewPage({ onStartSession, onOpenFeedback }) {
+export default function ReviewPage({ onStartSession, onOpenFeedback, onOpenBrowse }) {
   const { dueCards, cardCounts, loading } = useSrsDeck()
   const { stats, level, progress, loading: statsLoading } = useSrsStats()
 
@@ -74,13 +74,23 @@ export default function ReviewPage({ onStartSession, onOpenFeedback }) {
           </div>
         </div>
 
-        {/* Feedback button */}
-        <button
-          onClick={onOpenFeedback}
-          className="w-full py-3 rounded-xl bg-dojo-surface text-dojo-text font-semibold text-xs hover:bg-dojo-card transition-colors border border-dojo-border"
-        >
-          Feedback post-training
-        </button>
+        {/* Action buttons */}
+        <div className="grid grid-cols-2 gap-2">
+          {cardCounts.total > 0 && (
+            <button
+              onClick={onOpenBrowse}
+              className="py-3 rounded-xl bg-dojo-surface text-dojo-text font-semibold text-xs hover:bg-dojo-card transition-colors border border-dojo-border"
+            >
+              Consulter les cartes
+            </button>
+          )}
+          <button
+            onClick={onOpenFeedback}
+            className={`py-3 rounded-xl bg-dojo-surface text-dojo-text font-semibold text-xs hover:bg-dojo-card transition-colors border border-dojo-border ${cardCounts.total === 0 ? 'col-span-2' : ''}`}
+          >
+            Feedback post-training
+          </button>
+        </div>
       </div>
     </div>
   )

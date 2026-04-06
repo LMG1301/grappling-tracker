@@ -75,3 +75,12 @@ body {
 .input-field:focus {
   border-color: var(--color-dojo-accent);
 }
+
+/* Hide scrollbar for filter chips */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
