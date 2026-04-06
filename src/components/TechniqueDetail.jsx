@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, ExternalLink, Pencil, Trash2, Calendar } from 'lucide-react'
-import { ACTION_COLOR_MAP, ACTION_LABEL_MAP, MATURITY_LEVELS, MATURITY_COLOR_MAP } from '../config/constants'
+import { X, ExternalLink, Pencil, Trash2, Calendar, ChevronDown, Eye, EyeOff } from 'lucide-react'
+import { ACTION_COLOR_MAP, ACTION_LABEL_MAP, getSrsStatus, SRS_STATUS_META } from '../config/constants'
 
 function getYouTubeId(url) {
   if (!url) return null
@@ -70,9 +70,12 @@ export default function TechniqueDetail({ technique, imageUrl, techniques, onClo
     onClose()
   }
 
-  async function handleMaturityChange(newMaturity) {
-    if (!onUpdateTechnique || newMaturity === technique.maturity) return
-    await onUpdateTechnique(technique.id, { maturity: newMaturity })
+  const [showFlashcard, setShowFlashcard] = useState(false)
+  const srsStatus = getSrsStatus(technique)
+
+  async function handleToggleSrs() {
+    if (!onUpdateTechnique) return
+    await onUpdateTechnique(technique.id, { srs_active: !technique.srs_active })
   }
 
   return (
@@ -122,26 +125,78 @@ export default function TechniqueDetail({ technique, imageUrl, techniques, onClo
             )}
           </div>
 
-          {/* Maturity quick-change */}
-          <div>
-            <h3 className="text-sm font-medium text-dojo-muted mb-2">Maturite</h3>
-            <div className="flex gap-2">
-              {MATURITY_LEVELS.map((m) => (
-                <button
-                  key={m.value}
-                  onClick={() => handleMaturityChange(m.value)}
-                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all border ${
-                    technique.maturity === m.value
-                      ? 'border-transparent text-white shadow-md'
-                      : 'border-dojo-border bg-dojo-bg text-dojo-muted hover:border-dojo-accent/50'
-                  }`}
-                  style={technique.maturity === m.value ? { backgroundColor: m.color } : {}}
-                >
-                  {m.icon} {m.label}
-                </button>
-              ))}
+          {/* Flashcard / SRS section */}
+          {srsStatus && (
+            <div>
+              <button
+                onClick={() => setShowFlashcard(!showFlashcard)}
+                className="flex items-center justify-between w-full bg-transparent border-none p-0"
+              >
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-medium text-dojo-muted">Flashcard</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${SRS_STATUS_META[srsStatus].bgClass}`}>
+                    {SRS_STATUS_META[srsStatus].label}
+                  </span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-dojo-muted transition-transform ${showFlashcard ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showFlashcard && (
+                <div className="mt-2 space-y-3">
+                  {technique.situation && (
+                    <div className="bg-dojo-bg rounded-xl p-3 border border-dojo-border">
+                      <p className="text-[10px] font-bold text-dojo-accent uppercase mb-1">Situation</p>
+                      <p className="text-sm text-dojo-text leading-relaxed">{technique.situation}</p>
+                    </div>
+                  )}
+                  {technique.answer && (
+                    <div className="bg-dojo-bg rounded-xl p-3 border-l-4 border-l-dojo-accent border border-dojo-border">
+                      <p className="text-[10px] font-bold text-dojo-accent uppercase mb-1">Reponse</p>
+                      <p className="text-sm text-dojo-text leading-relaxed whitespace-pre-line">{technique.answer}</p>
+                    </div>
+                  )}
+                  {technique.cues && (
+                    <p className="text-xs text-dojo-muted italic px-1">{technique.cues}</p>
+                  )}
+
+                  {/* SRS state */}
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-dojo-bg rounded-lg p-2 border border-dojo-border">
+                      <p className="text-xs font-bold text-dojo-text">{technique.interval_days || 0}j</p>
+                      <p className="text-[9px] text-dojo-muted">Intervalle</p>
+                    </div>
+                    <div className="bg-dojo-bg rounded-lg p-2 border border-dojo-border">
+                      <p className="text-xs font-bold text-dojo-text">{technique.times_reviewed || 0}</p>
+                      <p className="text-[9px] text-dojo-muted">Reviews</p>
+                    </div>
+                    <div className="bg-dojo-bg rounded-lg p-2 border border-dojo-border">
+                      <p className="text-xs font-bold text-dojo-text">{technique.mat_success || 0}/{technique.mat_tested || 0}</p>
+                      <p className="text-[9px] text-dojo-muted">Mat</p>
+                    </div>
+                  </div>
+
+                  {technique.next_review && (
+                    <p className="text-[10px] text-dojo-muted">
+                      Prochain review : {new Date(technique.next_review).toLocaleDateString('fr-FR')}
+                    </p>
+                  )}
+
+                  {/* SRS active toggle */}
+                  <button
+                    onClick={handleToggleSrs}
+                    className={`flex items-center gap-2 w-full py-2 rounded-lg text-xs font-medium transition-colors border-none ${
+                      technique.srs_active
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-dojo-bg text-dojo-muted'
+                    }`}
+                  >
+                    {technique.srs_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    {technique.srs_active ? 'Active dans le deck SRS' : 'Desactivee du deck SRS'}
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {ytId && (
             <div className="aspect-video rounded-xl overflow-hidden">

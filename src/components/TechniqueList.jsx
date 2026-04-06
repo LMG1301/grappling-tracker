@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import { Search, ArrowUpDown } from 'lucide-react'
-import { ACTION_TYPES, ACTION_COLOR_MAP, ACTION_LABEL_MAP, MATURITY_LEVELS, MATURITY_COLOR_MAP, MATURITY_LABEL_MAP } from '../config/constants'
+import { Search, ArrowUpDown, Plus } from 'lucide-react'
+import { ACTION_TYPES, ACTION_COLOR_MAP, ACTION_LABEL_MAP, getSrsStatus, SRS_STATUS_META } from '../config/constants'
 
 function getYouTubeId(url) {
   if (!url) return null
@@ -18,11 +18,11 @@ function getThumbnail(technique, getImageUrl) {
   return null
 }
 
-export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
+export default function TechniqueList({ techniques, getImageUrl, onSelect, onAdd }) {
   const [search, setSearch] = useState('')
   const [filterAction, setFilterAction] = useState('')
   const [filterPosition, setFilterPosition] = useState('')
-  const [filterMaturity, setFilterMaturity] = useState('')
+  const [filterSrs, setFilterSrs] = useState('')
   const [sortBy, setSortBy] = useState('name')
 
   const positions = useMemo(
@@ -40,7 +40,11 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
       if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false
       if (filterAction && t.action_type !== filterAction) return false
       if (filterPosition && t.position !== filterPosition) return false
-      if (filterMaturity && t.maturity !== filterMaturity) return false
+      if (filterSrs) {
+        const status = getSrsStatus(t)
+        if (filterSrs === 'none' && status !== null) return false
+        if (filterSrs !== 'none' && status !== filterSrs) return false
+      }
       return true
     })
 
@@ -63,7 +67,7 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
     }
 
     return list
-  }, [techniques, search, filterAction, filterPosition, filterMaturity, sortBy])
+  }, [techniques, search, filterAction, filterPosition, filterSrs, sortBy])
 
   return (
     <div className="flex-1 flex flex-col">
@@ -125,14 +129,15 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
 
         <div className="flex gap-2">
           <select
-            value={filterMaturity}
-            onChange={(e) => setFilterMaturity(e.target.value)}
+            value={filterSrs}
+            onChange={(e) => setFilterSrs(e.target.value)}
             className="flex-1 bg-dojo-surface border border-dojo-border rounded-lg px-3 py-2 text-sm text-dojo-text appearance-none focus:outline-none focus:border-dojo-accent"
           >
-            <option value="">Toutes maturites</option>
-            {MATURITY_LEVELS.map((m) => (
-              <option key={m.value} value={m.value}>{m.icon} {m.label}</option>
-            ))}
+            <option value="">Tous etats SRS</option>
+            <option value="none">Sans flashcard</option>
+            <option value="new">Nouveau</option>
+            <option value="learning">Apprentissage</option>
+            <option value="mastered">Maitrise</option>
           </select>
           <div className="flex items-center gap-2 flex-1">
             <ArrowUpDown className="w-4 h-4 text-dojo-muted flex-shrink-0" />
@@ -185,14 +190,16 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
                     >
                       {ACTION_LABEL_MAP[t.action_type]}
                     </span>
-                    {t.maturity && (
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full text-white"
-                        style={{ backgroundColor: MATURITY_COLOR_MAP[t.maturity] }}
-                      >
-                        {MATURITY_LABEL_MAP[t.maturity]}
-                      </span>
-                    )}
+                    {(() => {
+                      const status = getSrsStatus(t)
+                      if (!status) return null
+                      const meta = SRS_STATUS_META[status]
+                      return (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${meta.bgClass}`}>
+                          {meta.label}
+                        </span>
+                      )
+                    })()}
                     <span className="text-xs text-dojo-muted truncate">{t.position}</span>
                     {t.learned_date && (
                       <span className="text-xs text-dojo-muted">
@@ -206,6 +213,16 @@ export default function TechniqueList({ techniques, getImageUrl, onSelect }) {
           })
         )}
       </div>
+
+      {/* FAB add button */}
+      {onAdd && (
+        <button
+          onClick={onAdd}
+          className="fixed bottom-6 right-4 w-14 h-14 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white z-40"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
+      )}
     </div>
   )
 }

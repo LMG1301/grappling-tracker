@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { X, Camera, Plus, Calendar } from 'lucide-react'
-import { ACTION_TYPES, MATURITY_LEVELS, MAX_IMAGE_SIZE, ACCEPTED_IMAGE_TYPES } from '../config/constants'
+import { X, Camera, Plus, Calendar, ChevronDown } from 'lucide-react'
+import { ACTION_TYPES, MAX_IMAGE_SIZE, ACCEPTED_IMAGE_TYPES } from '../config/constants'
 
 export default function TechniqueForm({ positions, techniques, onSubmit, onClose, onAddPosition, initialData }) {
   const [name, setName] = useState(initialData?.name || '')
   const [position, setPosition] = useState(initialData?.position || '')
   const [actionType, setActionType] = useState(initialData?.action_type || 'submission')
-  const [maturity, setMaturity] = useState(initialData?.maturity || 'seen')
   const [isFocus, setIsFocus] = useState(initialData?.is_focus || false)
+  const [situation, setSituation] = useState(initialData?.situation || '')
+  const [answer, setAnswer] = useState(initialData?.answer || '')
+  const [cues, setCues] = useState(initialData?.cues || '')
+  const [showFlashcard, setShowFlashcard] = useState(!!(initialData?.situation || initialData?.answer))
   const [keyPoints, setKeyPoints] = useState(initialData?.key_points || '')
   const [videoUrl, setVideoUrl] = useState(initialData?.video_url || '')
   const [notes, setNotes] = useState(initialData?.notes || '')
@@ -60,8 +63,11 @@ export default function TechniqueForm({ positions, techniques, onSubmit, onClose
         name: name.trim(),
         position,
         action_type: actionType,
-        maturity,
         is_focus: isFocus,
+        situation: situation || null,
+        answer: answer || null,
+        cues: cues || null,
+        srs_active: !!(situation && answer),
         key_points: keyPoints || null,
         video_url: videoUrl || null,
         notes: notes || null,
@@ -181,26 +187,54 @@ export default function TechniqueForm({ positions, techniques, onSubmit, onClose
             </div>
           </div>
 
-          {/* Maturity */}
+          {/* Flashcard fields (collapsible) */}
           <div>
-            <label className="block text-sm text-dojo-muted mb-2">Maturite</label>
-            <div className="grid grid-cols-4 gap-2">
-              {MATURITY_LEVELS.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMaturity(m.value)}
-                  className={`py-2 px-2 rounded-lg text-xs font-medium transition-all border ${
-                    maturity === m.value
-                      ? 'border-transparent text-white shadow-lg'
-                      : 'border-dojo-border bg-dojo-bg text-dojo-muted hover:border-dojo-accent/50'
-                  }`}
-                  style={maturity === m.value ? { backgroundColor: m.color } : {}}
-                >
-                  {m.icon} {m.label}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowFlashcard(!showFlashcard)}
+              className="flex items-center gap-1.5 text-sm text-dojo-muted hover:text-dojo-text transition-colors bg-transparent border-none p-0"
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform ${showFlashcard ? 'rotate-180' : ''}`} />
+              Flashcard (pour la review SRS)
+            </button>
+            {showFlashcard && (
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="block text-sm text-dojo-muted mb-1">Situation</label>
+                  <textarea
+                    value={situation}
+                    onChange={(e) => setSituation(e.target.value)}
+                    placeholder="Tu es en side control subi. L'adversaire a le crossface..."
+                    rows={3}
+                    className="w-full bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors resize-none"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-dojo-muted mb-1">Reponse</label>
+                  <textarea
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="1) Recuperer la position interieure..."
+                    rows={5}
+                    className="w-full bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors resize-none"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-dojo-muted mb-1">Cues</label>
+                  <textarea
+                    value={cues}
+                    onChange={(e) => setCues(e.target.value)}
+                    placeholder="Le corps suit la tete..."
+                    rows={2}
+                    className="w-full bg-dojo-bg border border-dojo-border rounded-lg px-4 py-3 text-dojo-text focus:outline-none focus:border-dojo-accent transition-colors resize-none"
+                    style={{ fontSize: '16px' }}
+                  />
+                  <p className="text-[10px] text-dojo-muted mt-0.5">Les cues qui t'aident a te rappeler</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

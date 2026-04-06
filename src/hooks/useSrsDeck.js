@@ -1,35 +1,39 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './useAuth'
-import { fetchDueCards, fetchAllCards, createCard, toggleCardActive, seedStarterDeck, getCardStatus } from '../lib/srs/deck'
-import { STARTER_DECK } from '../lib/srs/starter-deck'
+import { supabase } from '../lib/supabase'
+import { getSrsStatus } from '../config/constants'
 
 export function useSrsDeck() {
   const { user } = useAuth()
   const [dueCards, setDueCards] = useState([])
-  const [allCards, setAllCards] = useState([])
+  const [allSrsCards, setAllSrsCards] = useState([])
   const [loading, setLoading] = useState(true)
 
   const loadCards = useCallback(async () => {
     if (!user) return
     setLoading(true)
     try {
-      const [due, all] = await Promise.all([
-        fetchDueCards(user.id),
-        fetchAllCards(user.id),
-      ])
-      setDueCards(due)
-      setAllCards(all)
+      const today = new Date().toISOString().split('T')[0]
 
-      // Auto-seed starter deck if no cards
-      if (all.length === 0) {
-        await seedStarterDeck(user.id, STARTER_DECK)
-        const [newDue, newAll] = await Promise.all([
-          fetchDueCards(user.id),
-          fetchAllCards(user.id),
-        ])
-        setDueCards(newDue)
-        setAllCards(newAll)
-      }
+      // Fetch techniques with SRS active and due for review
+      const { data: due } = await supabase
+        .from('techniques')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('srs_active', true)
+        .or(`next_review.is.null,next_review.lte.${today}`)
+        .order('next_review', { ascending: true })
+
+      // Fetch all SRS-active techniques
+      const { data: all } = await supabase
+        .from('techniques')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('srs_active', true)
+        .order('created_at', { ascending: false })
+
+      setDueCards(due || [])
+      setAllSrsCards(all || [])
     } catch (e) {
       console.error('Failed to load SRS deck:', e)
     }
@@ -38,32 +42,19 @@ export function useSrsDeck() {
 
   useEffect(() => { loadCards() }, [loadCards])
 
-  const addCard = useCallback(async (cardData) => {
-    if (!user) return
-    await createCard(user.id, cardData)
-    await loadCards()
-  }, [user, loadCards])
-
-  const toggleActive = useCallback(async (cardId, isActive) => {
-    await toggleCardActive(cardId, isActive)
-    await loadCards()
-  }, [loadCards])
-
   const cardCounts = {
-    new: allCards.filter(c => getCardStatus(c) === 'new').length,
-    learning: allCards.filter(c => getCardStatus(c) === 'learning').length,
-    mastered: allCards.filter(c => getCardStatus(c) === 'mastered').length,
-    total: allCards.length,
+    new: allSrsCards.filter(c => getSrsStatus(c) === 'new').length,
+    learning: allSrsCards.filter(c => getSrsStatus(c) === 'learning').length,
+    mastered: allSrsCards.filter(c => getSrsStatus(c) === 'mastered').length,
+    total: allSrsCards.length,
     due: dueCards.length,
   }
 
   return {
     dueCards,
-    allCards,
+    allSrsCards,
     cardCounts,
     loading,
-    addCard,
-    toggleActive,
     reload: loadCards,
   }
 }

@@ -5,7 +5,7 @@ import ProgressDots from './ProgressDots'
 import FlashCard from './FlashCard'
 import SrsSessionSummary from './SessionSummary'
 
-export default function ReviewSession({ dueCards, onBack, onFeedback }) {
+export default function ReviewSession({ dueCards, onBack, onFeedback, getImageUrl }) {
   const {
     currentCard,
     currentIndex,
@@ -68,6 +68,7 @@ export default function ReviewSession({ dueCards, onBack, onFeedback }) {
                 intervals={intervals}
                 onFlip={flip}
                 onRate={rate}
+                getImageUrl={getImageUrl}
               />
             </motion.div>
           </AnimatePresence>

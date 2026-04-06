@@ -1,29 +1,45 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { ExternalLink } from 'lucide-react'
-import { CATEGORY_META } from '../../lib/srs/deck'
+import { ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../../config/constants'
+import { extractYoutubeId, getYoutubeThumbnail } from '../../lib/srs/youtube'
 import RatingButtons from './RatingButtons'
 
-export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate }) {
+function getTechniqueImage(technique, getImageUrl) {
+  if (technique.image_path) {
+    const url = getImageUrl?.(technique.image_path)
+    if (url) return url
+  }
+  const ytId = extractYoutubeId(technique.video_url)
+  if (ytId) return getYoutubeThumbnail(ytId)
+  return null
+}
+
+export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate, getImageUrl }) {
   if (!card) return null
 
-  const catMeta = CATEGORY_META[card.category] || { label: card.category, color: 'bg-gray-100 text-gray-700' }
+  const imageUrl = getTechniqueImage(card, getImageUrl)
+  const color = ACTION_COLOR_MAP[card.action_type]
 
   return (
     <div className="space-y-3">
-      {/* Category badge */}
+      {/* Badges */}
       <div className="flex items-center gap-2">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${catMeta.color}`}>
-          {catMeta.label}
+        <span
+          className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+          style={{ backgroundColor: color }}
+        >
+          {ACTION_LABEL_MAP[card.action_type]}
         </span>
-        <span className="text-[10px] text-dojo-muted">{card.position_name}</span>
+        <span className="text-[10px] text-dojo-muted">{card.position}</span>
+        <span className="text-[10px] font-medium text-dojo-text">{card.name}</span>
       </div>
 
       {/* Image */}
-      {card.image_url && (
+      {imageUrl && (
         <div className="w-full aspect-video rounded-xl overflow-hidden bg-dojo-surface">
           <img
-            src={card.image_url}
-            alt={card.position_name}
+            src={imageUrl}
+            alt={card.name}
             className="w-full h-full object-cover"
             loading="lazy"
           />
@@ -37,7 +53,6 @@ export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate }
 
       <AnimatePresence mode="wait">
         {!isFlipped ? (
-          /* RECTO: Show answer button */
           <motion.button
             key="flip-btn"
             initial={{ opacity: 0 }}
@@ -49,7 +64,6 @@ export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate }
             Voir la reponse
           </motion.button>
         ) : (
-          /* VERSO: Answer + rating */
           <motion.div
             key="answer"
             initial={{ opacity: 0, y: 10 }}
@@ -64,10 +78,6 @@ export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate }
 
               {card.cues && (
                 <p className="text-xs text-dojo-muted italic">{card.cues}</p>
-              )}
-
-              {card.grappling_link && (
-                <p className="text-xs text-dojo-accent font-medium">{card.grappling_link}</p>
               )}
             </div>
 

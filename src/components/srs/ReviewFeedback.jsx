@@ -21,9 +21,10 @@ export default function ReviewFeedback({ onBack }) {
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
 
       const { data } = await supabase
-        .from('srs_cards')
+        .from('techniques')
         .select('*')
         .eq('user_id', user.id)
+        .eq('srs_active', true)
         .gte('last_review', twoDaysAgo.toISOString().split('T')[0])
         .order('last_review', { ascending: false })
 

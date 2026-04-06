@@ -1,14 +1,11 @@
-import { useState } from 'react'
-import { Flame, Layers, BarChart3, Plus } from 'lucide-react'
+import { Flame, Layers, BarChart3 } from 'lucide-react'
 import { useSrsDeck } from '../../hooks/useSrsDeck'
 import { useSrsStats } from '../../hooks/useSrsStats'
 import XpBar from './XpBar'
-import CardEditor from './CardEditor'
 
-export default function ReviewPage({ onStartSession, onOpenDeck, onOpenFeedback }) {
-  const { dueCards, cardCounts, loading, addCard, reload } = useSrsDeck()
+export default function ReviewPage({ onStartSession, onOpenFeedback }) {
+  const { dueCards, cardCounts, loading } = useSrsDeck()
   const { stats, level, progress, loading: statsLoading } = useSrsStats()
-  const [showEditor, setShowEditor] = useState(false)
 
   if (loading || statsLoading) {
     return (
@@ -54,64 +51,37 @@ export default function ReviewPage({ onStartSession, onOpenDeck, onOpenFeedback 
         ) : (
           <div className="bg-white rounded-xl border border-dojo-border p-5 text-center space-y-2">
             <p className="text-sm font-semibold text-dojo-text">Toutes les cartes sont revues !</p>
-            <p className="text-xs text-dojo-muted">Reviens demain ou ajoute des cartes.</p>
+            <p className="text-xs text-dojo-muted">Ajoute des flashcards a tes techniques pour les revoir ici.</p>
           </div>
         )}
 
         {/* Stats mini */}
         <div className="grid grid-cols-3 gap-2">
-          <StatCard label="Nouvelles" value={cardCounts.new} color="text-blue-600" />
-          <StatCard label="En cours" value={cardCounts.learning} color="text-amber-600" />
+          <StatCard label="Nouvelles" value={cardCounts.new} color="text-orange-600" />
+          <StatCard label="En cours" value={cardCounts.learning} color="text-blue-600" />
           <StatCard label="Maitrisees" value={cardCounts.mastered} color="text-green-600" />
         </div>
 
         {/* Global stats */}
-        <div className="bg-white rounded-xl border border-dojo-border p-3">
+        <div className="bg-white rounded-xl border border-dojo-border p-3 space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-dojo-muted">Reviews totales</span>
-            <span className="text-xs font-bold text-dojo-text">{stats?.total_reviews || 0}</span>
+            <span className="text-xs text-dojo-muted">Total dans le deck</span>
+            <span className="text-xs font-bold text-dojo-text">{cardCounts.total}</span>
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-xs text-dojo-muted">Tests sur le mat</span>
-            <span className="text-xs font-bold text-dojo-text">{stats?.total_mat_tests || 0}</span>
-          </div>
-          <div className="flex items-center justify-between mt-1">
+          <div className="flex items-center justify-between">
             <span className="text-xs text-dojo-muted">XP total</span>
             <span className="text-xs font-bold text-dojo-accent">{stats?.total_xp || 0}</span>
           </div>
         </div>
 
-        {/* Action buttons */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={onOpenFeedback}
-            className="py-3 rounded-xl bg-dojo-surface text-dojo-text font-semibold text-xs hover:bg-dojo-card transition-colors border border-dojo-border"
-          >
-            Feedback mat
-          </button>
-          <button
-            onClick={onOpenDeck}
-            className="py-3 rounded-xl bg-dojo-surface text-dojo-text font-semibold text-xs hover:bg-dojo-card transition-colors border border-dojo-border flex items-center justify-center gap-1.5"
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            Mon deck
-          </button>
-        </div>
-        {/* FAB add button */}
+        {/* Feedback button */}
         <button
-          onClick={() => setShowEditor(true)}
-          className="fixed bottom-24 right-4 w-14 h-14 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white z-40"
+          onClick={onOpenFeedback}
+          className="w-full py-3 rounded-xl bg-dojo-surface text-dojo-text font-semibold text-xs hover:bg-dojo-card transition-colors border border-dojo-border"
         >
-          <Plus className="w-7 h-7" />
+          Feedback post-training
         </button>
       </div>
-
-      {showEditor && (
-        <CardEditor
-          onSave={async (formData) => { await addCard(formData); await reload(); setShowEditor(false) }}
-          onClose={() => setShowEditor(false)}
-        />
-      )}
     </div>
   )
 }

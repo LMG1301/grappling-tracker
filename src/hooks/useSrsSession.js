@@ -11,15 +11,15 @@ export function useSrsSession(dueCards) {
   const [isFlipped, setIsFlipped] = useState(false)
   const [ratings, setRatings] = useState([])
   const [isComplete, setIsComplete] = useState(false)
-  const [sessionId, setSessionId] = useState(null)
   const [elapsedSec, setElapsedSec] = useState(0)
   const timerRef = useRef(null)
   const startTimeRef = useRef(null)
 
-  // Initialize with due cards
+  // Initialize — shuffle to avoid same-category runs
   useEffect(() => {
     if (dueCards && dueCards.length > 0) {
-      setCards([...dueCards])
+      const shuffled = shuffleWithCategorySpacing([...dueCards])
+      setCards(shuffled)
       setCurrentIndex(0)
       setIsFlipped(false)
       setRatings([])
@@ -39,24 +39,41 @@ export function useSrsSession(dueCards) {
   }, [cards.length, isComplete])
 
   const currentCard = cards[currentIndex] || null
-  const intervals = currentCard ? previewIntervals(currentCard) : null
+
+  // Map technique fields to SM-2 expected fields
+  const cardForSm2 = currentCard ? {
+    ease_factor: currentCard.ease_factor || 2.5,
+    interval_days: currentCard.interval_days || 0,
+    repetitions: currentCard.srs_repetitions || 0,
+  } : null
+
+  const intervals = cardForSm2 ? previewIntervals(cardForSm2) : null
 
   const flip = useCallback(() => setIsFlipped(true), [])
 
   const rate = useCallback(async (rating) => {
     if (!currentCard) return
 
-    const srsUpdate = sm2(currentCard, rating)
+    const srsUpdate = sm2({
+      ease_factor: currentCard.ease_factor || 2.5,
+      interval_days: currentCard.interval_days || 0,
+      repetitions: currentCard.srs_repetitions || 0,
+    }, rating)
+
     const wasCorrect = rating >= 3
 
-    // Save to Supabase
+    // Update technique in Supabase
     if (user) {
       await supabase
-        .from('srs_cards')
+        .from('techniques')
         .update({
-          ...srsUpdate,
-          times_reviewed: currentCard.times_reviewed + 1,
-          times_correct: currentCard.times_correct + (wasCorrect ? 1 : 0),
+          ease_factor: srsUpdate.ease_factor,
+          interval_days: srsUpdate.interval_days,
+          srs_repetitions: srsUpdate.repetitions,
+          next_review: srsUpdate.next_review,
+          last_review: srsUpdate.last_review,
+          times_reviewed: (currentCard.times_reviewed || 0) + 1,
+          times_correct: (currentCard.times_correct || 0) + (wasCorrect ? 1 : 0),
         })
         .eq('id', currentCard.id)
     }
@@ -84,22 +101,16 @@ export function useSrsSession(dueCards) {
 
     const xpEarned = calculateSessionXp(allRatings)
     const cardsCorrect = allRatings.filter(r => r >= 3).length
-    const cardsAgain = allRatings.filter(r => r === 1).length
 
-    const { data } = await supabase
+    await supabase
       .from('srs_sessions')
       .insert({
         user_id: user.id,
         cards_reviewed: allRatings.length,
         cards_correct: cardsCorrect,
-        cards_again: cardsAgain,
         xp_earned: xpEarned,
         duration_sec: elapsedSec,
       })
-      .select()
-      .single()
-
-    if (data) setSessionId(data.id)
 
     // Update stats
     await updateStats(user.id, xpEarned, allRatings.length)
@@ -114,10 +125,29 @@ export function useSrsSession(dueCards) {
     ratings,
     intervals,
     elapsedSec,
-    sessionId,
     flip,
     rate,
   }
+}
+
+function shuffleWithCategorySpacing(cards) {
+  // Fisher-Yates shuffle then try to avoid same-category adjacency
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[cards[i], cards[j]] = [cards[j], cards[i]]
+  }
+  // Simple pass: if same action_type adjacent, swap with next different
+  for (let i = 1; i < cards.length; i++) {
+    if (cards[i].action_type === cards[i - 1].action_type) {
+      for (let j = i + 1; j < cards.length; j++) {
+        if (cards[j].action_type !== cards[i - 1].action_type) {
+          ;[cards[i], cards[j]] = [cards[j], cards[i]]
+          break
+        }
+      }
+    }
+  }
+  return cards
 }
 
 async function updateStats(userId, xpEarned, reviewCount) {
@@ -136,7 +166,6 @@ async function updateStats(userId, xpEarned, reviewCount) {
       longest_streak: 1,
       total_xp: xpEarned,
       level: 1,
-      total_reviews: reviewCount,
       last_review_date: today,
     })
     return
@@ -158,7 +187,6 @@ async function updateStats(userId, xpEarned, reviewCount) {
       longest_streak: Math.max(newStreak, stats.longest_streak),
       total_xp: totalXp,
       level: Math.floor(totalXp / 50) + 1,
-      total_reviews: stats.total_reviews + reviewCount,
       last_review_date: today,
       updated_at: new Date().toISOString(),
     })

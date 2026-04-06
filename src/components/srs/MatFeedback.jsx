@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { CATEGORY_META } from '../../lib/srs/deck'
+import { ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../../config/constants'
 import { XP_TABLE } from '../../lib/srs/xp'
 
 export default function MatFeedback({ cards, onDone }) {
@@ -22,16 +22,16 @@ export default function MatFeedback({ cards, onDone }) {
 
       await supabase.from('srs_mat_feedback').insert({
         user_id: user.id,
-        card_id: cardId,
+        technique_id: cardId,
         attempted,
         succeeded,
       })
 
-      // Update card mat counters
+      // Update technique mat counters
       const card = cards.find(c => c.id === cardId)
       if (card) {
         await supabase
-          .from('srs_cards')
+          .from('techniques')
           .update({
             mat_tested: card.mat_tested + (attempted ? 1 : 0),
             mat_success: card.mat_success + (succeeded ? 1 : 0),
@@ -78,16 +78,19 @@ export default function MatFeedback({ cards, onDone }) {
       </p>
 
       {cards.map(card => {
-        const catMeta = CATEGORY_META[card.category]
+        const color = ACTION_COLOR_MAP[card.action_type]
         const status = feedback[card.id] || 'none'
 
         return (
           <div key={card.id} className="bg-white rounded-xl border border-dojo-border p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${catMeta?.color || 'bg-gray-100 text-gray-700'}`}>
-                {catMeta?.label}
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                style={{ backgroundColor: color }}
+              >
+                {ACTION_LABEL_MAP[card.action_type]}
               </span>
-              <span className="text-xs font-medium text-dojo-text truncate">{card.position_name}</span>
+              <span className="text-xs font-medium text-dojo-text truncate">{card.name}</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
               <FeedbackBtn
