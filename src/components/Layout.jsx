@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Map, List, Plus, LogOut, BookOpen, Bot } from 'lucide-react'
+import { Map, List, Plus, LogOut, BookOpen, Bot, Activity } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useTechniques } from '../hooks/useTechniques'
 import { usePositions } from '../hooks/usePositions'
@@ -10,6 +10,9 @@ import TechniqueForm from './TechniqueForm'
 import TechniqueDetail from './TechniqueDetail'
 import JournalPage from './JournalPage'
 import CoachPage from './CoachPage'
+import MobilityPage from './mobility/MobilityPage'
+import MobilitySession from './mobility/MobilitySession'
+import MobilityStats from './mobility/MobilityStats'
 
 export default function Layout() {
   const { signOut } = useAuth()
@@ -22,6 +25,11 @@ export default function Layout() {
   const [showForm, setShowForm] = useState(false)
   const [editingTechnique, setEditingTechnique] = useState(null)
   const [selectedTechnique, setSelectedTechnique] = useState(null)
+
+  // Mobility state
+  const [mobilitySubView, setMobilitySubView] = useState('home') // 'home' | 'session' | 'stats'
+  const [mobilityRoutineType, setMobilityRoutineType] = useState(null)
+  const competitionWeek = 1 // TODO: connect to global context when S&C tracker is integrated
 
   async function handleSubmit(data, imageFile) {
     let image_path = editingTechnique?.image_path || null
@@ -108,6 +116,22 @@ export default function Layout() {
           onUpdate={updateEntry}
           onDelete={deleteEntry}
         />
+      ) : view === 'mobility' ? (
+        mobilitySubView === 'session' && mobilityRoutineType ? (
+          <MobilitySession
+            routineType={mobilityRoutineType}
+            competitionWeek={competitionWeek}
+            onBack={() => { setMobilitySubView('home'); setMobilityRoutineType(null) }}
+          />
+        ) : mobilitySubView === 'stats' ? (
+          <MobilityStats onBack={() => setMobilitySubView('home')} />
+        ) : (
+          <MobilityPage
+            competitionWeek={competitionWeek}
+            onStartSession={(type) => { setMobilityRoutineType(type); setMobilitySubView('session') }}
+            onOpenStats={() => setMobilitySubView('stats')}
+          />
+        )
       ) : (
         <CoachPage />
       )}
@@ -154,13 +178,13 @@ export default function Layout() {
         </button>
 
         <button
-          onClick={() => setView('coach')}
+          onClick={() => { setView('mobility'); setMobilitySubView('home'); setMobilityRoutineType(null) }}
           className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors bg-transparent border-none ${
-            view === 'coach' ? 'text-dojo-accent' : 'text-dojo-muted'
+            view === 'mobility' ? 'text-dojo-accent' : 'text-dojo-muted'
           }`}
         >
-          <Bot className="w-5 h-5" />
-          <span className="text-[10px]">Coach</span>
+          <Activity className="w-5 h-5" />
+          <span className="text-[10px]">Mobilite</span>
         </button>
       </nav>
 
