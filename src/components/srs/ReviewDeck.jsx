@@ -1,16 +1,30 @@
 import { useState } from 'react'
 import { ArrowLeft } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useSrsDeck } from '../../hooks/useSrsDeck'
 import DeckList from './DeckList'
 import CardEditor from './CardEditor'
 
 export default function ReviewDeck({ onBack }) {
-  const { allCards, toggleActive, addCard, loading } = useSrsDeck()
-  const [showEditor, setShowEditor] = useState(false)
+  const { allCards, toggleActive, addCard, reload, loading } = useSrsDeck()
+  const [editorState, setEditorState] = useState(null) // null | { mode: 'new' } | { mode: 'edit', card: {...} }
 
-  async function handleSave(formData) {
-    await addCard(formData)
-    setShowEditor(false)
+  async function handleSave(formData, cardId) {
+    if (cardId) {
+      // Edit mode
+      await supabase.from('srs_cards').update(formData).eq('id', cardId)
+    } else {
+      // New card
+      await addCard(formData)
+    }
+    await reload()
+    setEditorState(null)
+  }
+
+  async function handleDelete(cardId) {
+    await supabase.from('srs_cards').delete().eq('id', cardId)
+    await reload()
+    setEditorState(null)
   }
 
   if (loading) {
@@ -39,14 +53,17 @@ export default function ReviewDeck({ onBack }) {
         <DeckList
           cards={allCards}
           onToggleActive={toggleActive}
-          onAdd={() => setShowEditor(true)}
+          onAdd={() => setEditorState({ mode: 'new' })}
+          onEdit={(card) => setEditorState({ mode: 'edit', card })}
         />
       </div>
 
-      {showEditor && (
+      {editorState && (
         <CardEditor
+          initialData={editorState.mode === 'edit' ? editorState.card : null}
           onSave={handleSave}
-          onClose={() => setShowEditor(false)}
+          onDelete={editorState.mode === 'edit' ? handleDelete : null}
+          onClose={() => setEditorState(null)}
         />
       )}
     </div>

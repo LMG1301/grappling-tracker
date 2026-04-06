@@ -1,11 +1,14 @@
-import { Flame, Layers, BarChart3 } from 'lucide-react'
+import { useState } from 'react'
+import { Flame, Layers, BarChart3, Plus } from 'lucide-react'
 import { useSrsDeck } from '../../hooks/useSrsDeck'
 import { useSrsStats } from '../../hooks/useSrsStats'
 import XpBar from './XpBar'
+import CardEditor from './CardEditor'
 
 export default function ReviewPage({ onStartSession, onOpenDeck, onOpenFeedback }) {
-  const { dueCards, cardCounts, loading } = useSrsDeck()
+  const { dueCards, cardCounts, loading, addCard, reload } = useSrsDeck()
   const { stats, level, progress, loading: statsLoading } = useSrsStats()
+  const [showEditor, setShowEditor] = useState(false)
 
   if (loading || statsLoading) {
     return (
@@ -94,7 +97,21 @@ export default function ReviewPage({ onStartSession, onOpenDeck, onOpenFeedback 
             Mon deck
           </button>
         </div>
+        {/* FAB add button */}
+        <button
+          onClick={() => setShowEditor(true)}
+          className="fixed bottom-24 right-4 w-14 h-14 bg-dojo-accent hover:bg-dojo-accent-hover rounded-full flex items-center justify-center shadow-lg shadow-dojo-accent/30 transition-colors border-none text-white z-40"
+        >
+          <Plus className="w-7 h-7" />
+        </button>
       </div>
+
+      {showEditor && (
+        <CardEditor
+          onSave={async (formData) => { await addCard(formData); await reload(); setShowEditor(false) }}
+          onClose={() => setShowEditor(false)}
+        />
+      )}
     </div>
   )
 }

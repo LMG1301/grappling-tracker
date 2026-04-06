@@ -8,7 +8,7 @@ const STATUS_LABELS = {
   mastered: { label: 'Maitrise', color: 'bg-green-100 text-green-700' },
 }
 
-export default function DeckList({ cards, onToggleActive, onAdd }) {
+export default function DeckList({ cards, onToggleActive, onAdd, onEdit }) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all') // 'all' | 'new' | 'learning' | 'mastered'
 
@@ -60,43 +60,53 @@ export default function DeckList({ cards, onToggleActive, onAdd }) {
           const catMeta = CATEGORY_META[card.category]
 
           return (
-            <div
+            <button
               key={card.id}
-              className={`bg-white rounded-xl border p-3 transition-all ${
-                card.is_active ? 'border-dojo-border' : 'border-gray-200 opacity-50'
+              onClick={() => onEdit?.(card)}
+              className={`w-full text-left bg-white rounded-xl border p-3 transition-all ${
+                card.is_active ? 'border-dojo-border hover:border-dojo-accent/40' : 'border-gray-200 opacity-50'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${catMeta?.color || 'bg-gray-100 text-gray-700'}`}>
-                      {catMeta?.label}
-                    </span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${statusMeta?.color}`}>
-                      {statusMeta?.label}
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-dojo-text truncate">{card.position_name}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] text-dojo-muted">
-                      Intervalle: {card.interval_days}j
-                    </span>
-                    {card.mat_tested > 0 && (
-                      <span className="text-[10px] text-dojo-muted">
-                        Mat: {card.mat_success}/{card.mat_tested}
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                  {card.image_url && (
+                    <img
+                      src={card.image_url}
+                      alt=""
+                      className="w-12 h-9 rounded-lg object-cover flex-shrink-0 bg-dojo-surface"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${catMeta?.color || 'bg-gray-100 text-gray-700'}`}>
+                        {catMeta?.label}
                       </span>
-                    )}
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${statusMeta?.color}`}>
+                        {statusMeta?.label}
+                      </span>
+                    </div>
+                    <p className="text-sm font-medium text-dojo-text truncate">{card.position_name}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px] text-dojo-muted">
+                        Intervalle: {card.interval_days}j
+                      </span>
+                      {card.mat_tested > 0 && (
+                        <span className="text-[10px] text-dojo-muted">
+                          Mat: {card.mat_success}/{card.mat_tested}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => onToggleActive(card.id, !card.is_active)}
-                  className="p-1.5 rounded-lg hover:bg-dojo-surface transition-colors bg-transparent border-none text-dojo-muted"
+                <div
+                  onClick={(e) => { e.stopPropagation(); onToggleActive(card.id, !card.is_active) }}
+                  className="p-1.5 rounded-lg hover:bg-dojo-surface transition-colors text-dojo-muted"
                   title={card.is_active ? 'Desactiver' : 'Activer'}
                 >
                   {card.is_active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                </button>
+                </div>
               </div>
-            </div>
+            </button>
           )
         })}
       </div>
