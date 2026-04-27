@@ -35,7 +35,7 @@ function masteryPercent(technique) {
   return 100
 }
 
-function PositionImage({ slug, className = '' }) {
+function PositionImage({ slug, blurred = false, className = '' }) {
   const [errored, setErrored] = useState(false)
   if (!slug || errored) {
     return (
@@ -45,12 +45,14 @@ function PositionImage({ slug, className = '' }) {
     )
   }
   return (
-    <img
-      src={`/images/positions/${slug}.png`}
-      alt=""
-      onError={() => setErrored(true)}
-      className={className}
-    />
+    <div className={`relative bg-dojo-bg overflow-hidden ${className}`}>
+      <img
+        src={`/images/positions/${slug}.png`}
+        alt=""
+        onError={() => setErrored(true)}
+        className={`w-full h-full object-contain transition-[filter] duration-300 ${blurred ? 'blur-xl scale-110' : ''}`}
+      />
+    </div>
   )
 }
 
@@ -560,7 +562,7 @@ function PlayMode({ position, category, library, onBack, onOpenLibrary, onOpenTe
                 className="bg-dojo-card border-2 rounded-2xl overflow-hidden"
                 style={{ borderColor: color }}
               >
-                <PositionImage slug={position.slug} className="w-full h-40 object-cover bg-dojo-bg" />
+                <PositionImage slug={position.slug} blurred={!state.revealed} className="w-full h-48" />
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-[10px] font-bold uppercase tracking-wide text-dojo-muted">
