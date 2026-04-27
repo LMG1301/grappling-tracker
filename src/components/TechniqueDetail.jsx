@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, ExternalLink, Pencil, Trash2, Calendar, ChevronDown, Eye, EyeOff } from 'lucide-react'
+import { X, ExternalLink, Pencil, Trash2, Calendar, ChevronDown, Eye, EyeOff, Check } from 'lucide-react'
 import { ACTION_COLOR_MAP, ACTION_LABEL_MAP, getSrsStatus, SRS_STATUS_META } from '../config/constants'
 
 function getYouTubeId(url) {
@@ -42,10 +42,11 @@ function KeyPointsDisplay({ text }) {
   )
 }
 
-export default function TechniqueDetail({ technique, imageUrl, techniques, onClose, onEdit, onDelete, onUpdateTechnique, fetchLinks }) {
+export default function TechniqueDetail({ technique, imageUrl, techniques, onClose, onEdit, onDelete, onUpdateTechnique, fetchLinks, onLogCombat }) {
   const ytId = getYouTubeId(technique.video_url)
   const color = ACTION_COLOR_MAP[technique.action_type]
   const [linkedTechniques, setLinkedTechniques] = useState([])
+  const [logging, setLogging] = useState(false)
 
   useEffect(() => {
     if (!fetchLinks) return
@@ -65,9 +66,16 @@ export default function TechniqueDetail({ technique, imageUrl, techniques, onClo
   }, [technique.id, fetchLinks, techniques])
 
   async function handleDelete() {
+    if (!onDelete) return
     if (!window.confirm('Supprimer cette technique ?')) return
     await onDelete(technique.id)
     onClose()
+  }
+
+  async function handleLog(succeeded) {
+    if (!onLogCombat) return
+    await onLogCombat(succeeded)
+    setLogging(false)
   }
 
   const [showFlashcard, setShowFlashcard] = useState(false)
@@ -90,12 +98,16 @@ export default function TechniqueDetail({ technique, imageUrl, techniques, onClo
             {technique.name}
           </h2>
           <div className="flex items-center gap-1">
-            <button onClick={() => onEdit(technique)} className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-muted">
-              <Pencil className="w-5 h-5" />
-            </button>
-            <button onClick={handleDelete} className="p-2 hover:bg-red-500/20 rounded-lg transition-colors bg-transparent border-none text-red-400">
-              <Trash2 className="w-5 h-5" />
-            </button>
+            {onEdit && (
+              <button onClick={() => onEdit(technique)} className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-muted">
+                <Pencil className="w-5 h-5" />
+              </button>
+            )}
+            {onDelete && (
+              <button onClick={handleDelete} className="p-2 hover:bg-red-500/20 rounded-lg transition-colors bg-transparent border-none text-red-400">
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
             <button onClick={onClose} className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-text">
               <X className="w-5 h-5" />
             </button>
@@ -182,17 +194,19 @@ export default function TechniqueDetail({ technique, imageUrl, techniques, onClo
                   )}
 
                   {/* SRS active toggle */}
-                  <button
-                    onClick={handleToggleSrs}
-                    className={`flex items-center gap-2 w-full py-2 rounded-lg text-xs font-medium transition-colors border-none ${
-                      technique.srs_active
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-dojo-bg text-dojo-muted'
-                    }`}
-                  >
-                    {technique.srs_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                    {technique.srs_active ? 'Active dans le deck SRS' : 'Desactivee du deck SRS'}
-                  </button>
+                  {onUpdateTechnique && (
+                    <button
+                      onClick={handleToggleSrs}
+                      className={`flex items-center gap-2 w-full py-2 rounded-lg text-xs font-medium transition-colors border-none ${
+                        technique.srs_active
+                          ? 'bg-green-50 text-green-700'
+                          : 'bg-dojo-bg text-dojo-muted'
+                      }`}
+                    >
+                      {technique.srs_active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                      {technique.srs_active ? 'Active dans le deck SRS' : 'Desactivee du deck SRS'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -249,6 +263,48 @@ export default function TechniqueDetail({ technique, imageUrl, techniques, onClo
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Combat log (mode skill tree) */}
+          {onLogCombat && (
+            <div className="pt-2 border-t border-dojo-border">
+              {!logging ? (
+                <button
+                  onClick={() => setLogging(true)}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white border-none"
+                  style={{ backgroundColor: color }}
+                >
+                  Logger au tapis
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-dojo-muted">Tu as tente cette technique au sparring. Resultat ?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleLog(false)}
+                      className="bg-dojo-bg border-2 border-dojo-border rounded-xl py-3 flex flex-col items-center gap-1 text-dojo-text"
+                    >
+                      <X className="w-5 h-5 text-red-500" />
+                      <div className="text-xs font-bold">Echec</div>
+                    </button>
+                    <button
+                      onClick={() => handleLog(true)}
+                      className="border-2 rounded-xl py-3 flex flex-col items-center gap-1 border-none text-white"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Check className="w-5 h-5 text-white" />
+                      <div className="text-xs font-bold text-white">Reussi</div>
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setLogging(false)}
+                    className="w-full text-xs text-dojo-muted underline bg-transparent border-none py-1"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

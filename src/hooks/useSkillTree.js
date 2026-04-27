@@ -19,7 +19,7 @@ export function useSkillTree() {
       supabase.from('positions').select('*').order('sort_order'),
       supabase
         .from('position_library')
-        .select('id, position_id, technique_id, slot, technique:techniques(id, name, action_type, mat_tested, mat_success, notes, key_points, situation, video_url, image_path)')
+        .select('id, position_id, technique_id, slot, technique:techniques(*)')
         .eq('user_id', user.id),
       supabase
         .from('combat_logs')
@@ -141,6 +141,12 @@ export function useSkillTree() {
     await loadAll()
   }
 
+  function getImageUrl(path) {
+    if (!path) return null
+    const { data } = supabase.storage.from('technique-images').getPublicUrl(path)
+    return data.publicUrl
+  }
+
   return {
     categories,
     positions,
@@ -151,6 +157,7 @@ export function useSkillTree() {
     categoryStats,
     logCombat,
     swapSlot,
+    getImageUrl,
     refresh: loadAll,
   }
 }

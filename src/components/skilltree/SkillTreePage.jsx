@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Target, Shield, ArrowLeftRight, Plus, Check, X, Play, Eye, EyeOff, RotateCcw } from 'lucide-react'
+import { ChevronLeft, Target, Shield, ArrowLeftRight, Plus, Check, X, Play, Eye, EyeOff, RotateCcw } from 'lucide-react'
 import { useSkillTree } from '../../hooks/useSkillTree'
+import TechniqueDetail from '../TechniqueDetail'
 
 // --- Helpers visuels ---
 
@@ -126,99 +127,94 @@ function EmptySlotCard({ slot, color, onClick }) {
 }
 
 // ============================================================================
-// VUE 1 : HOME — Grille des 4 categories
+// VUE 1 : HOME — Toutes les categories et positions sur un seul ecran
 // ============================================================================
 
-function CategoryGrid({ categories, positions, categoryStats, onSelectCategory }) {
+function PositionTile({ position, category, stats, onClick }) {
+  const isEmpty = stats.techniquesCount === 0
+  const color = categoryColor(category)
   return (
-    <div className="flex-1 overflow-auto p-4 space-y-3">
-      <div className="text-sm text-dojo-muted mb-2">
-        Choisis une categorie pour voir les positions et tes cartes actives.
-      </div>
-      {categories.map((cat) => {
-        const stats = categoryStats(cat.id)
-        const positionsInCat = positions.filter((p) => p.category_id === cat.id)
-        return (
-          <motion.button
-            key={cat.id}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onSelectCategory(cat)}
-            className="w-full bg-dojo-card border rounded-2xl p-4 flex items-center gap-4 text-left"
-            style={{ borderColor: categoryColor(cat), borderWidth: 2 }}
-          >
-            <Donut value={stats.successRate} color={categoryColor(cat)} size={64} />
-            <div className="flex-1 min-w-0">
-              <div className="text-lg font-bold text-dojo-text">{cat.name}</div>
-              <div className="text-xs text-dojo-muted mt-1">
-                {positionsInCat.length} positions ·{' '}
-                {stats.positionsWithContent} avec contenu ·{' '}
-                {stats.totalTested} essais
-              </div>
-            </div>
-            <ChevronRight className="w-5 h-5 text-dojo-muted shrink-0" />
-          </motion.button>
-        )
-      })}
-    </div>
-  )
-}
-
-// ============================================================================
-// VUE 2 : CATEGORY — Liste des positions d'une categorie
-// ============================================================================
-
-function PositionList({ category, positions, positionStats, onBack, onSelectPosition }) {
-  const positionsInCat = positions.filter((p) => p.category_id === category.id)
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-dojo-border bg-dojo-surface">
-        <button onClick={onBack} className="p-1 -ml-1 text-dojo-muted bg-transparent border-none">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1">
-          <div className="text-base font-bold text-dojo-text">{category.name}</div>
-          <div className="text-xs text-dojo-muted">{positionsInCat.length} positions</div>
+    <button
+      onClick={() => !isEmpty && onClick()}
+      disabled={isEmpty}
+      className={`bg-dojo-card border rounded-xl p-3 text-left transition-opacity flex flex-col gap-2 min-h-[110px] ${isEmpty ? 'opacity-40 cursor-not-allowed' : 'hover:shadow-md'}`}
+      style={{ borderColor: color, borderWidth: 2 }}
+    >
+      <div className="flex items-start gap-2">
+        <Donut value={stats.successRate} color={color} size={36} stroke={3} />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-dojo-text leading-tight line-clamp-2">
+            {position.name}
+          </div>
         </div>
       </div>
-      <div className="flex-1 overflow-auto p-4 space-y-2">
-        {positionsInCat.map((p) => {
-          const stats = positionStats(p.id)
-          const isEmpty = stats.techniquesCount === 0
-          return (
-            <motion.button
-              key={p.id}
-              whileTap={{ scale: 0.99 }}
-              onClick={() => !isEmpty && onSelectPosition(p)}
-              disabled={isEmpty}
-              className={`w-full bg-dojo-card border rounded-xl p-3 flex items-center gap-3 text-left transition-opacity ${isEmpty ? 'opacity-50 cursor-not-allowed' : ''}`}
-              style={{ borderColor: categoryColor(category) }}
-            >
-              <Donut value={stats.successRate} color={categoryColor(category)} size={48} stroke={4} />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-dojo-text">{p.name}</div>
-                <div className="text-[11px] text-dojo-muted leading-tight mt-0.5 line-clamp-2">
-                  {isEmpty ? 'Vide. Ajoute des techniques pour debloquer.' : p.description}
-                </div>
-                <div className="text-[10px] text-dojo-muted mt-1">
-                  {stats.techniquesCount} techniques · {stats.tested} essais
-                </div>
-              </div>
-              {!isEmpty && <ChevronRight className="w-4 h-4 text-dojo-muted shrink-0" />}
-            </motion.button>
-          )
-        })}
+      <div className="text-[10px] text-dojo-muted mt-auto">
+        {stats.techniquesCount} tech · {stats.tested} essais
       </div>
+    </button>
+  )
+}
+
+function CategorySection({ category, positions, positionStats, categoryStats, onSelectPosition }) {
+  const stats = categoryStats(category.id)
+  const positionsInCat = positions.filter((p) => p.category_id === category.id)
+  const color = categoryColor(category)
+
+  return (
+    <section className="space-y-3">
+      <div
+        className="bg-dojo-card border-2 rounded-2xl p-4 flex items-center gap-4"
+        style={{ borderColor: color }}
+      >
+        <Donut value={stats.successRate} color={color} size={56} stroke={5} />
+        <div className="flex-1 min-w-0">
+          <div className="text-lg font-bold text-dojo-text leading-tight">{category.name}</div>
+          <div className="text-[11px] text-dojo-muted mt-1">
+            {positionsInCat.length} positions · {stats.positionsWithContent} avec contenu · {stats.totalTested} essais
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {positionsInCat.map((p) => (
+          <PositionTile
+            key={p.id}
+            position={p}
+            category={category}
+            stats={positionStats(p.id)}
+            onClick={() => onSelectPosition(p, category)}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SkillTreeHome({ categories, positions, positionStats, categoryStats, onSelectPosition }) {
+  return (
+    <div className="flex-1 overflow-auto p-4 space-y-6">
+      <div className="text-sm text-dojo-muted">
+        Tes positions par categorie. Tape une tuile pour voir tes 3 cartes actives et la bibliotheque.
+      </div>
+      {categories.map((cat) => (
+        <CategorySection
+          key={cat.id}
+          category={cat}
+          positions={positions}
+          positionStats={positionStats}
+          categoryStats={categoryStats}
+          onSelectPosition={onSelectPosition}
+        />
+      ))}
     </div>
   )
 }
 
 // ============================================================================
-// VUE 3 : POSITION DETAIL
+// VUE 2 : POSITION DETAIL
 // ============================================================================
 
-function PositionDetail({ position, category, library, positionStats, onBack, onSwap, onLogCombat, onPlay }) {
+function PositionDetail({ position, category, library, positionStats, onBack, onSwap, onOpenTechnique, onPlay }) {
   const [swapping, setSwapping] = useState(null)
-  const [logging, setLogging] = useState(null)
 
   const stats = positionStats(position.id)
   const entries = library.filter((l) => l.position_id === position.id)
@@ -238,16 +234,6 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
       toTechniqueId,
     })
     setSwapping(null)
-  }
-
-  async function handleLog(succeeded) {
-    if (!logging) return
-    await onLogCombat({
-      techniqueId: logging,
-      positionId: position.id,
-      succeeded,
-    })
-    setLogging(null)
   }
 
   return (
@@ -272,7 +258,6 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
           </div>
         )}
 
-        {/* Bouton JOUER */}
         {canPlay && (
           <button
             onClick={onPlay}
@@ -306,7 +291,7 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
                   <TechniqueCard
                     entry={entry}
                     color={color}
-                    onClick={() => setLogging(entry.technique_id)}
+                    onClick={() => onOpenTechnique(entry.technique, position.id)}
                   />
                   {inactive.length > 0 && (
                     <button
@@ -341,7 +326,7 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
                   key={entry.id}
                   entry={entry}
                   color={color}
-                  onClick={() => setLogging(entry.technique_id)}
+                  onClick={() => onOpenTechnique(entry.technique, position.id)}
                   compact
                 />
               ))}
@@ -390,59 +375,15 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
           </motion.div>
         )}
       </AnimatePresence>
-
-      <AnimatePresence>
-        {logging && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
-            onClick={() => setLogging(null)}
-          >
-            <motion.div
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-dojo-card rounded-2xl p-5"
-            >
-              <h3 className="text-base font-bold text-dojo-text mb-1">Log au tapis</h3>
-              <div className="text-xs text-dojo-muted mb-4">
-                Tu as tente cette technique au sparring. Resultat ?
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleLog(false)}
-                  className="bg-dojo-surface border-2 border-dojo-border rounded-xl py-4 flex flex-col items-center gap-1 text-dojo-text"
-                >
-                  <X className="w-6 h-6 text-red-500" />
-                  <div className="text-sm font-bold">Echec</div>
-                  <div className="text-[10px] text-dojo-muted">tente, pas reussi</div>
-                </button>
-                <button
-                  onClick={() => handleLog(true)}
-                  className="border-2 rounded-xl py-4 flex flex-col items-center gap-1"
-                  style={{ backgroundColor: color, borderColor: color }}
-                >
-                  <Check className="w-6 h-6 text-white" />
-                  <div className="text-sm font-bold text-white">Reussi</div>
-                  <div className="text-[10px] text-white/80">tente et reussi</div>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
 
 // ============================================================================
-// VUE 4 : PLAY — Mode jeu, 3 cartes floutees a deviner
+// VUE 3 : PLAY — Mode jeu, 3 cartes floutees a deviner
 // ============================================================================
 
-function PlayMode({ position, category, library, onBack, onLogCombat }) {
+function PlayMode({ position, category, library, onBack, onOpenTechnique }) {
   const color = categoryColor(category)
   const entries = library.filter((l) => l.position_id === position.id)
   const activeEntries = useMemo(
@@ -451,11 +392,9 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
     [position.id, library.length]
   )
 
-  // Etat par carte : { revealed: bool, knew: bool|null }
   const [cardStates, setCardStates] = useState(() =>
     activeEntries.map(() => ({ revealed: false, knew: null }))
   )
-  const [logging, setLogging] = useState(null) // technique_id en cours de log au tapis
   const [showResults, setShowResults] = useState(false)
 
   function reveal(idx) {
@@ -473,16 +412,6 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
 
   const allAnswered = cardStates.every((s) => s.knew !== null)
   const score = cardStates.filter((s) => s.knew === true).length
-
-  async function handleLog(succeeded) {
-    if (!logging) return
-    await onLogCombat({
-      techniqueId: logging,
-      positionId: position.id,
-      succeeded,
-    })
-    setLogging(null)
-  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -515,7 +444,6 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
           </div>
         </div>
 
-        {/* Cartes floutees */}
         <div className="space-y-3">
           {activeEntries.map((entry, idx) => {
             const state = cardStates[idx]
@@ -558,9 +486,15 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
                     animate={{ opacity: 1, scale: 1 }}
                     className="space-y-3"
                   >
-                    <div className="text-xl font-bold text-dojo-text leading-tight">
-                      {t.name}
-                    </div>
+                    <button
+                      onClick={() => onOpenTechnique(t, position.id)}
+                      className="text-left w-full bg-transparent border-none p-0"
+                    >
+                      <div className="text-xl font-bold text-dojo-text leading-tight underline decoration-dotted underline-offset-4">
+                        {t.name}
+                      </div>
+                      <div className="text-[10px] text-dojo-muted mt-1">Voir la fiche</div>
+                    </button>
 
                     {state.knew === null && (
                       <div className="grid grid-cols-2 gap-2 pt-2">
@@ -583,20 +517,12 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
                     )}
 
                     {state.knew !== null && (
-                      <div className="flex items-center justify-between pt-1">
-                        <div
-                          className={`text-xs font-bold flex items-center gap-1 ${state.knew ? '' : 'text-dojo-muted'}`}
-                          style={state.knew ? { color } : {}}
-                        >
-                          {state.knew ? <Check className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                          {state.knew ? 'Tu connaissais' : 'Pas pense'}
-                        </div>
-                        <button
-                          onClick={() => setLogging(entry.technique_id)}
-                          className="text-[10px] font-semibold text-dojo-muted underline"
-                        >
-                          Logger au tapis
-                        </button>
+                      <div
+                        className={`text-xs font-bold flex items-center gap-1 ${state.knew ? '' : 'text-dojo-muted'}`}
+                        style={state.knew ? { color } : {}}
+                      >
+                        {state.knew ? <Check className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                        {state.knew ? 'Tu connaissais' : 'Pas pense'}
                       </div>
                     )}
                   </motion.div>
@@ -606,7 +532,6 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
           })}
         </div>
 
-        {/* Resultats */}
         {allAnswered && !showResults && (
           <motion.button
             initial={{ opacity: 0, y: 10 }}
@@ -657,49 +582,6 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
           </motion.div>
         )}
       </div>
-
-      {/* Modal log au tapis */}
-      <AnimatePresence>
-        {logging && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
-            onClick={() => setLogging(null)}
-          >
-            <motion.div
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              exit={{ y: 100 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md bg-dojo-card rounded-2xl p-5"
-            >
-              <h3 className="text-base font-bold text-dojo-text mb-1">Log au tapis</h3>
-              <div className="text-xs text-dojo-muted mb-4">
-                Tu as tente cette technique au sparring. Resultat ?
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleLog(false)}
-                  className="bg-dojo-surface border-2 border-dojo-border rounded-xl py-4 flex flex-col items-center gap-1 text-dojo-text"
-                >
-                  <X className="w-6 h-6 text-red-500" />
-                  <div className="text-sm font-bold">Echec</div>
-                </button>
-                <button
-                  onClick={() => handleLog(true)}
-                  className="border-2 rounded-xl py-4 flex flex-col items-center gap-1"
-                  style={{ backgroundColor: color, borderColor: color }}
-                >
-                  <Check className="w-6 h-6 text-white" />
-                  <div className="text-sm font-bold text-white">Reussi</div>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
@@ -710,11 +592,13 @@ function PlayMode({ position, category, library, onBack, onLogCombat }) {
 
 export default function SkillTreePage() {
   const skillTree = useSkillTree()
-  const { categories, positions, library, loading, positionStats, categoryStats, swapSlot, logCombat } = skillTree
+  const { categories, positions, library, loading, positionStats, categoryStats, swapSlot, logCombat, getImageUrl } = skillTree
 
   const [subView, setSubView] = useState('home')
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [selectedPosition, setSelectedPosition] = useState(null)
+  const [openedTechnique, setOpenedTechnique] = useState(null)
+  const [openedTechniquePositionId, setOpenedTechniquePositionId] = useState(null)
 
   if (loading) {
     return (
@@ -724,20 +608,29 @@ export default function SkillTreePage() {
     )
   }
 
+  function openTechnique(technique, positionId) {
+    setOpenedTechnique(technique)
+    setOpenedTechniquePositionId(positionId)
+  }
+
+  function closeTechnique() {
+    setOpenedTechnique(null)
+    setOpenedTechniquePositionId(null)
+  }
+
+  let content
   if (subView === 'play' && selectedPosition && selectedCategory) {
-    return (
+    content = (
       <PlayMode
         position={selectedPosition}
         category={selectedCategory}
         library={library}
         onBack={() => setSubView('position')}
-        onLogCombat={logCombat}
+        onOpenTechnique={openTechnique}
       />
     )
-  }
-
-  if (subView === 'position' && selectedPosition && selectedCategory) {
-    return (
+  } else if (subView === 'position' && selectedPosition && selectedCategory) {
+    content = (
       <PositionDetail
         position={selectedPosition}
         category={selectedCategory}
@@ -745,26 +638,23 @@ export default function SkillTreePage() {
         positionStats={positionStats}
         onBack={() => {
           setSelectedPosition(null)
-          setSubView('category')
-        }}
-        onSwap={swapSlot}
-        onLogCombat={logCombat}
-        onPlay={() => setSubView('play')}
-      />
-    )
-  }
-
-  if (subView === 'category' && selectedCategory) {
-    return (
-      <PositionList
-        category={selectedCategory}
-        positions={positions}
-        positionStats={positionStats}
-        onBack={() => {
           setSelectedCategory(null)
           setSubView('home')
         }}
-        onSelectPosition={(p) => {
+        onSwap={swapSlot}
+        onOpenTechnique={openTechnique}
+        onPlay={() => setSubView('play')}
+      />
+    )
+  } else {
+    content = (
+      <SkillTreeHome
+        categories={categories}
+        positions={positions}
+        positionStats={positionStats}
+        categoryStats={categoryStats}
+        onSelectPosition={(p, cat) => {
+          setSelectedCategory(cat)
           setSelectedPosition(p)
           setSubView('position')
         }}
@@ -773,14 +663,23 @@ export default function SkillTreePage() {
   }
 
   return (
-    <CategoryGrid
-      categories={categories}
-      positions={positions}
-      categoryStats={categoryStats}
-      onSelectCategory={(cat) => {
-        setSelectedCategory(cat)
-        setSubView('category')
-      }}
-    />
+    <>
+      {content}
+      {openedTechnique && (
+        <TechniqueDetail
+          technique={openedTechnique}
+          imageUrl={getImageUrl(openedTechnique.image_path)}
+          onClose={closeTechnique}
+          onLogCombat={async (succeeded) => {
+            await logCombat({
+              techniqueId: openedTechnique.id,
+              positionId: openedTechniquePositionId,
+              succeeded,
+            })
+            closeTechnique()
+          }}
+        />
+      )}
+    </>
   )
 }
