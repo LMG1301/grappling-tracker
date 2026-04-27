@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, Target, Shield, ArrowLeftRight, RefreshCcw, Plus, Check, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Target, Shield, ArrowLeftRight, Plus, Check, X, Play, Eye, EyeOff, RotateCcw } from 'lucide-react'
 import { useSkillTree } from '../../hooks/useSkillTree'
 
 // --- Helpers visuels ---
@@ -25,7 +25,6 @@ function categoryColor(category, deep = false) {
   return deep ? category.color_deep_hex : category.color_hex
 }
 
-// Donut SVG simple pour afficher un pourcentage
 function Donut({ value, color, size = 64, stroke = 6 }) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
@@ -56,8 +55,6 @@ function Donut({ value, color, size = 64, stroke = 6 }) {
     </div>
   )
 }
-
-// --- Carte technique (style textuel, sans illustration pour l'instant) ---
 
 function TechniqueCard({ entry, color, onClick, compact = false }) {
   const t = entry.technique
@@ -113,8 +110,6 @@ function TechniqueCard({ entry, color, onClick, compact = false }) {
     </motion.button>
   )
 }
-
-// --- Carte slot vide (placeholder) ---
 
 function EmptySlotCard({ slot, color, onClick }) {
   return (
@@ -218,10 +213,10 @@ function PositionList({ category, positions, positionStats, onBack, onSelectPosi
 }
 
 // ============================================================================
-// VUE 3 : POSITION DETAIL — 3 slots actifs + bibliotheque + swap
+// VUE 3 : POSITION DETAIL
 // ============================================================================
 
-function PositionDetail({ position, category, library, positionStats, onBack, onSwap, onLogCombat }) {
+function PositionDetail({ position, category, library, positionStats, onBack, onSwap, onLogCombat, onPlay }) {
   const [swapping, setSwapping] = useState(null)
   const [logging, setLogging] = useState(null)
 
@@ -232,6 +227,8 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
   )
   const inactive = entries.filter((e) => e.slot == null)
   const color = categoryColor(category)
+  const activeCount = activeSlots.filter(Boolean).length
+  const canPlay = activeCount > 0
 
   async function handleSwapPick(toTechniqueId) {
     if (!swapping) return
@@ -275,12 +272,27 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
           </div>
         )}
 
+        {/* Bouton JOUER */}
+        {canPlay && (
+          <button
+            onClick={onPlay}
+            className="w-full rounded-2xl py-4 px-5 flex items-center justify-center gap-3 border-2 shadow-sm"
+            style={{ backgroundColor: color, borderColor: color }}
+          >
+            <Play className="w-5 h-5 text-white fill-white" />
+            <div className="text-left">
+              <div className="text-base font-bold text-white">Jouer</div>
+              <div className="text-[11px] text-white/80">Devine les {activeCount} cartes actives</div>
+            </div>
+          </button>
+        )}
+
         <div>
           <div className="flex items-center gap-2 mb-2">
             <Target className="w-4 h-4" style={{ color }} />
             <h2 className="text-sm font-bold text-dojo-text">Cartes actives</h2>
             <div className="text-[10px] text-dojo-muted ml-auto">
-              {activeSlots.filter(Boolean).length}/3
+              {activeCount}/3
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -427,6 +439,272 @@ function PositionDetail({ position, category, library, positionStats, onBack, on
 }
 
 // ============================================================================
+// VUE 4 : PLAY — Mode jeu, 3 cartes floutees a deviner
+// ============================================================================
+
+function PlayMode({ position, category, library, onBack, onLogCombat }) {
+  const color = categoryColor(category)
+  const entries = library.filter((l) => l.position_id === position.id)
+  const activeEntries = useMemo(
+    () => [1, 2, 3].map((slot) => entries.find((e) => e.slot === slot)).filter(Boolean),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [position.id, library.length]
+  )
+
+  // Etat par carte : { revealed: bool, knew: bool|null }
+  const [cardStates, setCardStates] = useState(() =>
+    activeEntries.map(() => ({ revealed: false, knew: null }))
+  )
+  const [logging, setLogging] = useState(null) // technique_id en cours de log au tapis
+  const [showResults, setShowResults] = useState(false)
+
+  function reveal(idx) {
+    setCardStates((prev) => prev.map((s, i) => (i === idx ? { ...s, revealed: true } : s)))
+  }
+
+  function answer(idx, knew) {
+    setCardStates((prev) => prev.map((s, i) => (i === idx ? { ...s, knew } : s)))
+  }
+
+  function reset() {
+    setCardStates(activeEntries.map(() => ({ revealed: false, knew: null })))
+    setShowResults(false)
+  }
+
+  const allAnswered = cardStates.every((s) => s.knew !== null)
+  const score = cardStates.filter((s) => s.knew === true).length
+
+  async function handleLog(succeeded) {
+    if (!logging) return
+    await onLogCombat({
+      techniqueId: logging,
+      positionId: position.id,
+      succeeded,
+    })
+    setLogging(null)
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-dojo-border bg-dojo-surface">
+        <button onClick={onBack} className="p-1 -ml-1 text-dojo-muted bg-transparent border-none">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
+            Mode jeu
+          </div>
+          <div className="text-base font-bold text-dojo-text truncate">{position.name}</div>
+        </div>
+        <button
+          onClick={reset}
+          className="p-2 bg-dojo-card border border-dojo-border rounded-lg text-dojo-muted"
+          title="Recommencer"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div className="bg-dojo-card border border-dojo-border rounded-xl p-3">
+          <div className="text-xs font-bold text-dojo-text mb-1">
+            Tu es en {position.name}.
+          </div>
+          <div className="text-xs text-dojo-muted leading-relaxed">
+            Quelles sont tes 3 options principales depuis cette position ? Reflechis avant de reveler.
+          </div>
+        </div>
+
+        {/* Cartes floutees */}
+        <div className="space-y-3">
+          {activeEntries.map((entry, idx) => {
+            const state = cardStates[idx]
+            const t = entry.technique
+            return (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="bg-dojo-card border-2 rounded-2xl p-4"
+                style={{ borderColor: color }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wide text-dojo-muted">
+                    Carte {idx + 1}
+                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-dojo-muted flex items-center gap-1">
+                    <span>{actionTypeIcon(t.action_type)}</span>
+                    <span>{t.action_type}</span>
+                  </div>
+                </div>
+
+                {!state.revealed ? (
+                  <button
+                    onClick={() => reveal(idx)}
+                    className="w-full py-6 px-4 bg-dojo-surface border-2 border-dashed border-dojo-border rounded-xl flex flex-col items-center gap-2 hover:bg-dojo-card transition-colors"
+                  >
+                    <div className="text-2xl font-bold text-dojo-muted tracking-widest blur-sm select-none">
+                      ▓▓▓▓▓▓▓▓▓
+                    </div>
+                    <div className="flex items-center gap-2 text-dojo-muted text-xs font-semibold">
+                      <Eye className="w-4 h-4" />
+                      Toucher pour reveler
+                    </div>
+                  </button>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="space-y-3"
+                  >
+                    <div className="text-xl font-bold text-dojo-text leading-tight">
+                      {t.name}
+                    </div>
+
+                    {state.knew === null && (
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        <button
+                          onClick={() => answer(idx, false)}
+                          className="bg-dojo-surface border-2 border-dojo-border rounded-xl py-3 flex flex-col items-center gap-1 text-dojo-text"
+                        >
+                          <EyeOff className="w-5 h-5 text-dojo-muted" />
+                          <div className="text-xs font-bold">Pas pense</div>
+                        </button>
+                        <button
+                          onClick={() => answer(idx, true)}
+                          className="border-2 rounded-xl py-3 flex flex-col items-center gap-1"
+                          style={{ backgroundColor: color, borderColor: color }}
+                        >
+                          <Check className="w-5 h-5 text-white" />
+                          <div className="text-xs font-bold text-white">Connaissais</div>
+                        </button>
+                      </div>
+                    )}
+
+                    {state.knew !== null && (
+                      <div className="flex items-center justify-between pt-1">
+                        <div
+                          className={`text-xs font-bold flex items-center gap-1 ${state.knew ? '' : 'text-dojo-muted'}`}
+                          style={state.knew ? { color } : {}}
+                        >
+                          {state.knew ? <Check className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                          {state.knew ? 'Tu connaissais' : 'Pas pense'}
+                        </div>
+                        <button
+                          onClick={() => setLogging(entry.technique_id)}
+                          className="text-[10px] font-semibold text-dojo-muted underline"
+                        >
+                          Logger au tapis
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </motion.div>
+            )
+          })}
+        </div>
+
+        {/* Resultats */}
+        {allAnswered && !showResults && (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={() => setShowResults(true)}
+            className="w-full rounded-xl py-3 px-4 border-2 font-bold text-white"
+            style={{ backgroundColor: color, borderColor: color }}
+          >
+            Voir mon score
+          </motion.button>
+        )}
+
+        {showResults && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-dojo-card border-2 rounded-2xl p-5 text-center"
+            style={{ borderColor: color }}
+          >
+            <div className="text-xs font-bold uppercase tracking-wide text-dojo-muted mb-1">
+              Score
+            </div>
+            <div className="text-4xl font-bold mb-2" style={{ color }}>
+              {score}/{activeEntries.length}
+            </div>
+            <div className="text-xs text-dojo-muted mb-4">
+              {score === activeEntries.length
+                ? 'Tu connais ton repertoire sur cette position.'
+                : score === 0
+                  ? 'Bonne occasion de relire les fiches techniques.'
+                  : 'Pas mal. Continue de drill.'}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={reset}
+                className="bg-dojo-surface border-2 border-dojo-border rounded-xl py-3 text-sm font-bold text-dojo-text"
+              >
+                Recommencer
+              </button>
+              <button
+                onClick={onBack}
+                className="border-2 rounded-xl py-3 text-sm font-bold text-white"
+                style={{ backgroundColor: color, borderColor: color }}
+              >
+                Retour
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Modal log au tapis */}
+      <AnimatePresence>
+        {logging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
+            onClick={() => setLogging(null)}
+          >
+            <motion.div
+              initial={{ y: 100 }}
+              animate={{ y: 0 }}
+              exit={{ y: 100 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-dojo-card rounded-2xl p-5"
+            >
+              <h3 className="text-base font-bold text-dojo-text mb-1">Log au tapis</h3>
+              <div className="text-xs text-dojo-muted mb-4">
+                Tu as tente cette technique au sparring. Resultat ?
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleLog(false)}
+                  className="bg-dojo-surface border-2 border-dojo-border rounded-xl py-4 flex flex-col items-center gap-1 text-dojo-text"
+                >
+                  <X className="w-6 h-6 text-red-500" />
+                  <div className="text-sm font-bold">Echec</div>
+                </button>
+                <button
+                  onClick={() => handleLog(true)}
+                  className="border-2 rounded-xl py-4 flex flex-col items-center gap-1"
+                  style={{ backgroundColor: color, borderColor: color }}
+                >
+                  <Check className="w-6 h-6 text-white" />
+                  <div className="text-sm font-bold text-white">Reussi</div>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// ============================================================================
 // COMPOSANT PRINCIPAL
 // ============================================================================
 
@@ -446,6 +724,18 @@ export default function SkillTreePage() {
     )
   }
 
+  if (subView === 'play' && selectedPosition && selectedCategory) {
+    return (
+      <PlayMode
+        position={selectedPosition}
+        category={selectedCategory}
+        library={library}
+        onBack={() => setSubView('position')}
+        onLogCombat={logCombat}
+      />
+    )
+  }
+
   if (subView === 'position' && selectedPosition && selectedCategory) {
     return (
       <PositionDetail
@@ -459,6 +749,7 @@ export default function SkillTreePage() {
         }}
         onSwap={swapSlot}
         onLogCombat={logCombat}
+        onPlay={() => setSubView('play')}
       />
     )
   }
