@@ -11,10 +11,11 @@ et `public/images/categories/`.
 npm run download-images
 ```
 
-Le script utilise Puppeteer (Chromium headless) — la premiere installation peut
-prendre quelques minutes. Si une page GrappleMap est manquante, le script log
-un warning et continue ; l'app affichera un placeholder pour les images
-manquantes.
+Le script parse `GrappleMap.txt` (raw GitHub) et matche chaque slug local par
+combinaison de tags (closed_guard + top_kneeling, etc.), puis telecharge les
+PNG statiques. Pas de navigateur requis. Si un slug ne matche aucune position,
+le script log un warning et continue ; l'app affichera un placeholder pour
+les images manquantes.
 
 # React + Vite
 

@@ -1,11 +1,17 @@
 #!/usr/bin/env node
-// Telecharge un snapshot PNG des positions de GrappleMap (eel.is/GrappleMap),
-// projet en domaine public, et copie 4 images vers public/images/categories/.
+// Telecharge un snapshot PNG des positions depuis GrappleMap (eel.is/GrappleMap),
+// projet en domaine public.
+//
+// Approche : on parse le fichier source GrappleMap.txt (raw GitHub) qui liste
+// les ~900 positions du dataset avec leurs tags. Pour chaque slug local, on
+// definit un ensemble de tags requis ; on score les positions GrappleMap par
+// le nombre de tags matches et on prend la meilleure. L'index sequentiel de
+// la position correspond directement a son ID dans les URLs d'images :
+//   http://eel.is/GrappleMap/res/p{ID}N480x360.png
 //
 // Usage : npm run download-images
-// Prerequis : `npm install` (installe puppeteer en devDependency).
+// Aucun navigateur requis : juste fetch + node fs.
 
-import puppeteer from 'puppeteer'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -15,45 +21,58 @@ const ROOT = path.resolve(path.dirname(__filename), '..')
 const POSITIONS_DIR = path.join(ROOT, 'public', 'images', 'positions')
 const CATEGORIES_DIR = path.join(ROOT, 'public', 'images', 'categories')
 
-// slug local (Supabase) -> slug GrappleMap
-const POSITION_MAP = {
-  standing_neutral: 'standing',
-  front_headlock: 'front_headlock',
-  single_leg: 'single_leg',
-  double_leg: 'double_leg',
-  snap_down: 'front_headlock',
-  sprawl: 'sprawl',
-  body_lock: 'bodylock',
-  two_on_one: 'standing',
-  closed_guard_top: 'closed_guard_top',
-  open_guard_top: 'open_guard_top',
-  half_guard_top: 'half_guard_top',
-  side_control_top: 'side_control',
-  mount_top: 'mount',
-  north_south_top: 'north_south',
-  knee_on_belly: 'knee_on_belly',
-  back_control: 'back_control',
-  turtle_top: 'turtle_top',
-  closed_guard_bottom: 'closed_guard',
-  butterfly_guard: 'butterfly_guard',
-  half_guard_bottom: 'half_guard',
-  z_guard: 'z_guard',
-  x_guard: 'x_guard',
-  single_leg_x: 'single_leg_x',
-  seated_open_guard: 'seated_guard',
-  supine_guard: 'supine_guard',
-  side_control_bottom: 'side_control_bottom',
-  mount_bottom: 'mount_bottom',
-  back_taken: 'back_taken',
-  turtle_bottom: 'turtle',
-  north_south_bottom: 'north_south_bottom',
-  kob_bottom: 'knee_on_belly_bottom',
-  scramble: 'scramble',
-  leg_entanglement: 'leg_entanglement',
-  dogfight: 'dogfight',
+const GM_TXT_URL = 'https://raw.githubusercontent.com/Eelis/GrappleMap/master/GrappleMap.txt'
+const IMAGE_URL = (id) => `http://eel.is/GrappleMap/res/p${id}N480x360.png`
+
+// Pour chaque slug local, on liste les tags requis. Le script choisira la
+// position GrappleMap qui matche le plus de tags. `must` doit etre present,
+// `prefer` ajoute des points. `avoid` retire des points. `name_contains`
+// (optionnel) booste si le nom contient ces sous-chaines.
+const POSITION_QUERIES = {
+  // --- Standing ---
+  standing_neutral: { must: ['standing'], avoid: ['bottom_supine', 'bottom_seated', 'sprawl'] },
+  front_headlock: { must: ['headlock'], name_contains: ['front'], avoid: ['side', 'twister'] },
+  single_leg: { must: ['single_leg_takedown'], avoid: [] },
+  double_leg: { must: ['double_leg_takedown'] },
+  snap_down: { must: ['headlock'], name_contains: ['snap'] },
+  sprawl: { must: ['sprawl'] },
+  body_lock: { must: ['body_lock'] },
+  two_on_one: { must: ['two_on_one'] },
+
+  // --- On top ---
+  closed_guard_top: { must: ['closed_guard', 'top_kneeling'], avoid: ['rubber_guard', 'top_posture_broken', 'collar_tie'] },
+  open_guard_top: { must: ['top_kneeling', 'bottom_supine'], avoid: ['closed_guard', 'half_guard', 'side_control', 'mount', 'knee_on_belly', 'back', 'rubber_guard', 'butterfly'] },
+  half_guard_top: { must: ['half_guard', 'top_kneeling'], avoid: ['bottom_supine', 'reverse_half', 'deep_half'] },
+  side_control_top: { must: ['side_control', 'top_kneeling'], avoid: ['twister_side', 'judo_side'] },
+  mount_top: { must: ['mount', 'top_kneeling'], avoid: ['three_quarter_mount', 's_mount', 'bottom_supine'] },
+  north_south_top: { must: ['north_south', 'top_kneeling'] },
+  knee_on_belly: { must: ['knee_on_belly'], prefer: ['top_kneeling'], avoid: ['bottom_supine'] },
+  back_control: { must: ['back'], prefer: ['top_kneeling'], avoid: ['bottom_seated', 'crucifix', 'truck'] },
+  turtle_top: { must: ['turtle', 'top_kneeling'] },
+
+  // --- On bottom ---
+  closed_guard_bottom: { must: ['closed_guard', 'bottom_supine'], avoid: ['rubber_guard', 'top_posture_broken'] },
+  butterfly_guard: { must: ['butterfly', 'bottom_seated'], avoid: ['engaged_butterfly', 'reverse_butterfly'] },
+  half_guard_bottom: { must: ['half_guard', 'bottom_supine'], avoid: ['top_kneeling', 'deep_half', 'reverse_half'] },
+  z_guard: { must: ['z_guard'] },
+  x_guard: { must: ['x_guard'], avoid: ['slx'] },
+  single_leg_x: { must: ['slx'] },
+  seated_open_guard: { must: ['bottom_seated'], prefer: ['butterfly'], avoid: ['back', 'turtle', 'crab_ride', 'engaged_butterfly'] },
+  supine_guard: { must: ['bottom_supine'], avoid: ['closed_guard', 'half_guard', 'side_control', 'mount', 'knee_on_belly', 'back', 'north_south', 'rubber_guard', 'twister_side'], name_contains: ['guard'] },
+  side_control_bottom: { must: ['side_control', 'bottom_supine'], avoid: ['twister_side', 'judo_side'] },
+  mount_bottom: { must: ['mount', 'bottom_supine'], avoid: ['three_quarter_mount', 's_mount', 'top_kneeling'] },
+  back_taken: { must: ['back', 'bottom_seated'], avoid: ['top_kneeling'] },
+  turtle_bottom: { must: ['turtle'], avoid: ['top_kneeling'], prefer: ['bottom_kneeling', 'all_fours'] },
+  north_south_bottom: { must: ['north_south', 'bottom_supine'] },
+  kob_bottom: { must: ['knee_on_belly', 'bottom_supine'] },
+
+  // --- Transitions (souvent absent du tag-set, on s'appuie sur le nom) ---
+  scramble: { must: [], prefer: ['scramble'], name_contains: ['scramble'], avoid: [] },
+  leg_entanglement: { must: [], prefer: ['ashi', 'ashi_waza', 'slx', '50_50'], name_contains: ['ashi', 'leg drag', 'entanglement', '50/50', 'fifty'], avoid: ['back'] },
+  dogfight: { must: [], prefer: ['dogfight'], name_contains: ['dogfight'] },
 }
 
-// categorie -> slug local (sera copie depuis le PNG positions correspondant)
+// Categories utilisent un slug local de position comme source.
 const CATEGORY_MAP = {
   standing: 'standing_neutral',
   on_top: 'mount_top',
@@ -61,73 +80,151 @@ const CATEGORY_MAP = {
   transitions: 'scramble',
 }
 
-async function captureCanvas(browser, slug) {
-  const url = `http://eel.is/GrappleMap/p/${slug}`
-  const page = await browser.newPage()
-  await page.setViewport({ width: 800, height: 800, deviceScaleFactor: 2 })
-  try {
-    const response = await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 })
-    if (!response || response.status() === 404) {
-      console.warn(`[skip] 404 for ${slug}`)
-      await page.close()
-      return null
+async function fetchText(url) {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`)
+  return res.text()
+}
+
+async function fetchBuffer(url) {
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const ab = await res.arrayBuffer()
+  return Buffer.from(ab)
+}
+
+// Parse GrappleMap.txt en blocks de 6 lignes :
+//   1: nom (peut contenir des "\n" litteraux)
+//   2: tags: t1 t2 t3
+//   3-6: 4 lignes de coordonnees (commencent par 4 espaces)
+function parsePositions(text) {
+  // Le fichier contient d'abord la section positions, puis les transitions.
+  // Les transitions ont une ligne `properties:` apres `tags:`. On coupe au
+  // premier `properties:` rencontre pour ne garder que les positions.
+  const cutoff = text.indexOf('\nproperties:')
+  const positionSection = cutoff > 0 ? text.slice(0, cutoff) : text
+
+  const lines = positionSection.split('\n')
+  const positions = []
+  let i = 0
+  while (i < lines.length) {
+    if (i + 1 >= lines.length) break
+    const nameLine = lines[i]
+    const tagsLine = lines[i + 1]
+    if (!tagsLine || !tagsLine.startsWith('tags:')) {
+      i++
+      continue
     }
-    // Le canvas WebGL met du temps a rendre le stick figure
-    await page.waitForSelector('canvas', { timeout: 15000 })
-    await new Promise((r) => setTimeout(r, 2500))
-    const canvas = await page.$('canvas')
-    if (!canvas) {
-      console.warn(`[skip] no canvas for ${slug}`)
-      await page.close()
-      return null
+    // Une position valide a exactement 4 lignes de data (4-space-prefixed)
+    const dataLines = []
+    let j = i + 2
+    while (j < lines.length && lines[j].startsWith('    ')) {
+      dataLines.push(lines[j])
+      j++
     }
-    const buffer = await canvas.screenshot({ type: 'png', omitBackground: false })
-    await page.close()
-    return buffer
-  } catch (err) {
-    console.warn(`[skip] ${slug}: ${err.message}`)
-    try { await page.close() } catch {}
-    return null
+    if (dataLines.length !== 4) {
+      i++
+      continue
+    }
+    const tags = tagsLine.replace(/^tags:\s*/, '').trim().split(/\s+/).filter(Boolean)
+    const name = nameLine.replace(/\\n/g, ' ').trim()
+    positions.push({ id: positions.length, name, tags })
+    i = j
   }
+  return positions
+}
+
+function scorePosition(pos, query) {
+  const tags = new Set(pos.tags)
+  const must = query.must || []
+  for (const t of must) {
+    if (!tags.has(t)) return -Infinity
+  }
+  let score = must.length * 10
+  for (const t of (query.prefer || [])) {
+    if (tags.has(t)) score += 5
+  }
+  for (const t of (query.avoid || [])) {
+    if (tags.has(t)) score -= 8
+  }
+  const name = pos.name.toLowerCase()
+  for (const sub of (query.name_contains || [])) {
+    if (name.includes(sub.toLowerCase())) score += 6
+  }
+  // Tie-breaker : moins de tags = position plus "pure"
+  score -= pos.tags.length * 0.05
+  return score
+}
+
+function findBestMatch(positions, query) {
+  let best = null
+  let bestScore = -Infinity
+  for (const p of positions) {
+    const s = scorePosition(p, query)
+    if (s > bestScore) {
+      bestScore = s
+      best = p
+    }
+  }
+  return best && bestScore > -Infinity ? { ...best, score: bestScore } : null
 }
 
 async function main() {
   await fs.mkdir(POSITIONS_DIR, { recursive: true })
   await fs.mkdir(CATEGORIES_DIR, { recursive: true })
 
-  const browser = await puppeteer.launch({ headless: 'new' })
-  const localToBuffer = new Map()
+  console.log('fetching GrappleMap.txt ...')
+  const txt = await fetchText(GM_TXT_URL)
+  const positions = parsePositions(txt)
+  console.log(`parsed ${positions.length} positions`)
 
-  // Cache des slugs GrappleMap deja telecharges (plusieurs locaux peuvent
-  // pointer vers le meme slug GrappleMap).
-  const remoteCache = new Map()
-
-  for (const [localSlug, remoteSlug] of Object.entries(POSITION_MAP)) {
-    let buffer = remoteCache.get(remoteSlug)
-    if (buffer === undefined) {
-      console.log(`fetching ${remoteSlug} ...`)
-      buffer = await captureCanvas(browser, remoteSlug)
-      remoteCache.set(remoteSlug, buffer)
+  const matches = {}
+  for (const [localSlug, query] of Object.entries(POSITION_QUERIES)) {
+    const m = findBestMatch(positions, query)
+    if (!m) {
+      console.warn(`[no-match] ${localSlug}`)
+      continue
     }
-    if (!buffer) continue
+    matches[localSlug] = m
+    console.log(`  ${localSlug} -> p${m.id} "${m.name}" (score ${m.score.toFixed(1)})`)
+  }
+
+  // Cache : plusieurs slugs peuvent pointer vers le meme p{id}, on ne re-download pas
+  const idCache = new Map()
+
+  for (const [localSlug, m] of Object.entries(matches)) {
+    let buf = idCache.get(m.id)
+    if (buf === undefined) {
+      const url = IMAGE_URL(m.id)
+      console.log(`fetching ${url}`)
+      buf = await fetchBuffer(url)
+      idCache.set(m.id, buf)
+    }
+    if (!buf) {
+      console.warn(`[skip] ${localSlug} : no image for p${m.id}`)
+      continue
+    }
     const out = path.join(POSITIONS_DIR, `${localSlug}.png`)
-    await fs.writeFile(out, buffer)
-    localToBuffer.set(localSlug, buffer)
+    await fs.writeFile(out, buf)
     console.log(`  wrote ${path.relative(ROOT, out)}`)
   }
 
   for (const [categorySlug, sourceLocal] of Object.entries(CATEGORY_MAP)) {
-    const buffer = localToBuffer.get(sourceLocal)
-    if (!buffer) {
-      console.warn(`[skip] category ${categorySlug}: source ${sourceLocal} missing`)
+    const m = matches[sourceLocal]
+    if (!m) {
+      console.warn(`[skip] category ${categorySlug}: source ${sourceLocal} has no match`)
+      continue
+    }
+    const buf = idCache.get(m.id)
+    if (!buf) {
+      console.warn(`[skip] category ${categorySlug}: no image`)
       continue
     }
     const out = path.join(CATEGORIES_DIR, `${categorySlug}.png`)
-    await fs.writeFile(out, buffer)
+    await fs.writeFile(out, buf)
     console.log(`  wrote ${path.relative(ROOT, out)}`)
   }
 
-  await browser.close()
   console.log('done.')
 }
 
