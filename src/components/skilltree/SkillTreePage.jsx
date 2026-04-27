@@ -562,7 +562,6 @@ function PlayMode({ position, category, library, onBack, onOpenLibrary, onOpenTe
                 className="bg-dojo-card border-2 rounded-2xl overflow-hidden"
                 style={{ borderColor: color }}
               >
-                <PositionImage slug={position.slug} blurred={!state.revealed} className="w-full h-48" />
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-[10px] font-bold uppercase tracking-wide text-dojo-muted">
@@ -639,6 +638,14 @@ function PlayMode({ position, category, library, onBack, onOpenLibrary, onOpenTe
               </motion.div>
             )
           })}
+        </div>
+
+        {/* Illustration de la position de base, sous les cartes */}
+        <div className="flex justify-center pt-2">
+          <PositionImage
+            slug={position.slug}
+            className="w-full max-w-xs aspect-[4/3] rounded-xl border border-dojo-border"
+          />
         </div>
       </div>
 
