@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { sm2 } from '../lib/srs/sm2'
 import { useAuth } from './useAuth'
 
 export function useSkillTree() {
@@ -56,8 +57,20 @@ export function useSkillTree() {
             ((success + PRIOR_SUCCESS) / (tested + PRIOR_SUCCESS + PRIOR_FAILURE)) * 100
           )
 
-    const techniquesCount = library.filter((l) => l.position_id === positionId).length
-    return { tested, success, successRate, techniquesCount }
+    const entries = library.filter((l) => l.position_id === positionId)
+    const techniquesCount = entries.length
+    const today = new Date().toISOString().split('T')[0]
+    const dueCount = entries.filter((e) => {
+      const t = e.technique
+      if (!t) return false
+      // Une technique est due si elle a une next_review passee ou aujourd'hui,
+      // ou si elle n'a jamais ete revue (next_review null) et qu'elle a deja
+      // ete activee dans le SRS.
+      if (!t.next_review) return t.times_reviewed === 0
+      return t.next_review <= today
+    }).length
+
+    return { tested, success, successRate, techniquesCount, dueCount }
   }, [combatLogs, library])
 
   const categoryStats = useCallback((categoryId) => {
@@ -147,6 +160,40 @@ export function useSkillTree() {
     return data.publicUrl
   }
 
+  // Notation SRS — rating : 1=Again, 2=Hard, 3=Good, 4=Easy
+  async function srsRate({ techniqueId, rating }) {
+    if (!user) return
+    const entry = library.find((l) => l.technique_id === techniqueId)
+    const t = entry?.technique
+    if (!t) return
+
+    const update = sm2(
+      {
+        ease_factor: t.ease_factor || 2.5,
+        interval_days: t.interval_days || 0,
+        repetitions: t.srs_repetitions || 0,
+      },
+      rating
+    )
+    const wasCorrect = rating >= 3
+
+    await supabase
+      .from('techniques')
+      .update({
+        ease_factor: update.ease_factor,
+        interval_days: update.interval_days,
+        srs_repetitions: update.repetitions,
+        next_review: update.next_review,
+        last_review: update.last_review,
+        times_reviewed: (t.times_reviewed || 0) + 1,
+        times_correct: (t.times_correct || 0) + (wasCorrect ? 1 : 0),
+        srs_active: true,
+      })
+      .eq('id', techniqueId)
+
+    await loadAll()
+  }
+
   return {
     categories,
     positions,
@@ -157,6 +204,7 @@ export function useSkillTree() {
     categoryStats,
     logCombat,
     swapSlot,
+    srsRate,
     getImageUrl,
     refresh: loadAll,
   }
