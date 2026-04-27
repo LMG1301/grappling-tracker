@@ -9,6 +9,7 @@ import TechniqueList from './TechniqueList'
 import TechniqueForm from './TechniqueForm'
 import TechniqueDetail from './TechniqueDetail'
 import JournalPage from './JournalPage'
+import SkillTreePage from './skilltree/SkillTreePage'
 import MobilityPage from './mobility/MobilityPage'
 import MobilitySession from './mobility/MobilitySession'
 import MobilityStats from './mobility/MobilityStats'
@@ -20,6 +21,7 @@ import BrowseCards from './srs/BrowseCards'
 const TABS = [
   { id: 'review', label: 'Review' },
   { id: 'techniques', label: 'Techniques' },
+  { id: 'skilltree', label: 'Skill Tree' },
   { id: 'journal', label: 'Journal' },
   { id: 'mobility', label: 'Mobilite' },
 ]
@@ -141,6 +143,8 @@ export default function Layout() {
           onSelect={setSelectedTechnique}
           onAdd={() => { setShowForm(true); setEditingTechnique(null) }}
         />
+      ) : view === 'skilltree' ? (
+        <SkillTreePage />
       ) : view === 'journal' ? (
         <JournalPage
           entries={journalEntries}
