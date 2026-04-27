@@ -40,13 +40,22 @@ export function useSkillTree() {
     loadAll()
   }, [loadAll])
 
-  // Helpers de calcul
+  // Lissage bayesien : a priori neutre 50%, equivalent a 10 essais virtuels
+  const PRIOR_SUCCESS = 5
+  const PRIOR_FAILURE = 5
 
   const positionStats = useCallback((positionId) => {
     const logs = combatLogs.filter((l) => l.position_id === positionId && l.attempted)
     const tested = logs.length
     const success = logs.filter((l) => l.succeeded).length
-    const successRate = tested === 0 ? null : Math.round((success / tested) * 100)
+
+    const successRate =
+      tested === 0
+        ? null
+        : Math.round(
+            ((success + PRIOR_SUCCESS) / (tested + PRIOR_SUCCESS + PRIOR_FAILURE)) * 100
+          )
+
     const techniquesCount = library.filter((l) => l.position_id === positionId).length
     return { tested, success, successRate, techniquesCount }
   }, [combatLogs, library])
@@ -66,7 +75,13 @@ export function useSkillTree() {
       if (stats.techniquesCount > 0) positionsWithContent += 1
     })
 
-    const successRate = totalTested === 0 ? null : Math.round((totalSuccess / totalTested) * 100)
+    const successRate =
+      totalTested === 0
+        ? null
+        : Math.round(
+            ((totalSuccess + PRIOR_SUCCESS) / (totalTested + PRIOR_SUCCESS + PRIOR_FAILURE)) * 100
+          )
+
     return {
       successRate,
       totalTested,
@@ -76,8 +91,6 @@ export function useSkillTree() {
       positionsWithContent,
     }
   }, [positions, positionStats])
-
-  // Mutations
 
   async function logCombat({ techniqueId, positionId, succeeded, context = 'sparring', notes = null }) {
     if (!user) return
@@ -94,7 +107,6 @@ export function useSkillTree() {
       console.error('logCombat failed', error)
       return
     }
-    // Mettre a jour aussi les compteurs sur techniques (cache)
     const { data: tech } = await supabase
       .from('techniques')
       .select('mat_tested, mat_success')
@@ -114,8 +126,6 @@ export function useSkillTree() {
 
   async function swapSlot({ positionId, fromTechniqueId, toTechniqueId }) {
     if (!user) return
-    // fromTechniqueId est dans un slot actif. toTechniqueId est dans la bibliotheque (slot null).
-    // On echange leurs slots.
     const fromEntry = library.find(
       (l) => l.position_id === positionId && l.technique_id === fromTechniqueId
     )
@@ -125,11 +135,7 @@ export function useSkillTree() {
     if (!fromEntry || !toEntry) return
 
     const fromSlot = fromEntry.slot
-
-    // On doit faire les updates en 2 temps pour ne pas violer le UNIQUE(user, position, slot)
-    // Etape 1 : libere le slot from
     await supabase.from('position_library').update({ slot: null }).eq('id', fromEntry.id)
-    // Etape 2 : assigne le slot a to
     await supabase.from('position_library').update({ slot: fromSlot }).eq('id', toEntry.id)
 
     await loadAll()
