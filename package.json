@@ -11,6 +11,7 @@
     "download-images": "node scripts/download-grapplemap-images.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@supabase/supabase-js": "^2.98.0",
     "@xyflow/react": "^12.10.1",
     "framer-motion": "^12.38.0",
