@@ -1,25 +1,66 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
-  ChevronRight,
+  ReactFlow,
+  ReactFlowProvider,
+  Background,
+  Controls,
+  Handle,
+  Position as HandlePosition,
+  useReactFlow,
+} from '@xyflow/react'
+import { motion } from 'framer-motion'
+import {
   Info,
   CheckCircle,
   ArrowRight,
-  HelpCircle,
   X,
   Wrench,
+  HelpCircle,
+  Maximize2,
 } from 'lucide-react'
 import { useMindMap } from '../../hooks/useMindMap'
 import TechniqueDetail from '../TechniqueDetail'
 
-// IDs composites pour le set des noeuds deplies
-const catKey = (id) => `cat:${id}`
-const posKey = (id) => `pos:${id}`
-const techKey = (id) => `tech:${id}`
+// =====================================================================
+// Constantes & helpers
+// =====================================================================
 
-// =====================================================================
-// Helpers visuels
-// =====================================================================
+const CENTER_ID = 'center'
+
+// Position relative des 4 categories autour du centre.
+// Indices = sort_order (0..3) : Debout, Au-dessus, En dessous, Scrambles & Other.
+// Angles en degres : 0 = est, 90 = sud, 180 = ouest, -90 = nord.
+const CATEGORY_SLOTS = [
+  { angle: -135, distance: 320 }, // top-left  -> Debout
+  { angle: -45, distance: 320 },  // top-right -> Au-dessus
+  { angle: 135, distance: 320 },  // bot-left  -> En dessous
+  { angle: 45, distance: 320 },   // bot-right -> Scrambles & Other
+]
+
+const POSITION_DISTANCE = 220
+const POSITION_FAN_ARC = 90 // degres
+
+const TECH_DISTANCE = 160
+const TECH_FAN_ARC = 70
+
+const LINK_DISTANCE = 100
+
+const deg2rad = (d) => (d * Math.PI) / 180
+
+function polar(cx, cy, angleDeg, distance) {
+  return {
+    x: cx + Math.cos(deg2rad(angleDeg)) * distance,
+    y: cy + Math.sin(deg2rad(angleDeg)) * distance,
+  }
+}
+
+function fanAngles(centerAngle, count, arc) {
+  if (count === 0) return []
+  if (count === 1) return [centerAngle]
+  const start = centerAngle - arc / 2
+  const end = centerAngle + arc / 2
+  return Array.from({ length: count }, (_, i) => start + (i / (count - 1)) * (end - start))
+}
 
 function actionTypeIcon(type) {
   const map = {
@@ -36,6 +77,446 @@ function actionTypeIcon(type) {
   }
   return map[type] || '•'
 }
+
+// Convertit "#RRGGBB" en "rgba(r, g, b, alpha)"
+function alphaColor(hex, alpha) {
+  if (!hex || !hex.startsWith('#')) return hex
+  const clean = hex.slice(1)
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+// Handles invisibles (utilises par React Flow pour tracer les edges).
+function HiddenHandles() {
+  const style = { opacity: 0, pointerEvents: 'none', width: 1, height: 1 }
+  return (
+    <>
+      <Handle type="target" position={HandlePosition.Left} style={style} />
+      <Handle type="source" position={HandlePosition.Right} style={style} />
+    </>
+  )
+}
+
+// =====================================================================
+// Custom nodes
+// =====================================================================
+
+function CenterNode({ data }) {
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation()
+        data.onToggle(CENTER_ID)
+      }}
+      style={{
+        background: '#1A2D4F',
+        color: 'white',
+        borderRadius: 24,
+        padding: '12px 22px',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontWeight: 700,
+        fontSize: 16,
+        textAlign: 'center',
+        boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
+        minWidth: 140,
+      }}
+    >
+      <HiddenHandles />
+      Grappling
+    </div>
+  )
+}
+
+function CategoryNode({ data }) {
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation()
+        data.onToggle(data.id)
+      }}
+      style={{
+        background: data.color,
+        color: 'white',
+        borderRadius: 22,
+        padding: '8px 16px',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        boxShadow: '0 3px 10px rgba(0,0,0,0.15)',
+        minWidth: 120,
+        textAlign: 'center',
+        position: 'relative',
+      }}
+    >
+      <HiddenHandles />
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          data.onInfo(data.id)
+        }}
+        style={{
+          position: 'absolute',
+          top: 4,
+          right: 4,
+          background: 'rgba(255,255,255,0.2)',
+          border: 'none',
+          borderRadius: 6,
+          padding: 2,
+          cursor: 'pointer',
+          color: 'white',
+        }}
+        title="Voir la fiche"
+      >
+        <Info style={{ width: 12, height: 12 }} />
+      </button>
+      <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>{data.label}</div>
+      <div style={{ fontSize: 10, opacity: 0.85, marginTop: 2 }}>
+        {data.count} position{data.count > 1 ? 's' : ''}
+      </div>
+    </div>
+  )
+}
+
+function PositionNode({ data }) {
+  return (
+    <motion.div
+      animate={
+        data.pulsed
+          ? {
+              boxShadow: [
+                '0 0 0 0 ' + alphaColor(data.color, 0.0),
+                '0 0 0 14px ' + alphaColor(data.color, 0.5),
+                '0 0 0 0 ' + alphaColor(data.color, 0.0),
+              ],
+            }
+          : { boxShadow: '0 2px 8px rgba(0,0,0,0.10)' }
+      }
+      transition={{ duration: 1.5 }}
+      onClick={(e) => {
+        e.stopPropagation()
+        data.onToggle(data.id)
+      }}
+      style={{
+        background: alphaColor(data.color, 0.18),
+        border: `2px solid ${data.color}`,
+        color: '#1A1A1A',
+        borderRadius: 20,
+        padding: '7px 14px',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        minWidth: 110,
+        textAlign: 'center',
+        position: 'relative',
+      }}
+    >
+      <HiddenHandles />
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          data.onInfo(data.id)
+        }}
+        style={{
+          position: 'absolute',
+          top: 3,
+          right: 3,
+          background: 'rgba(255,255,255,0.85)',
+          border: 'none',
+          borderRadius: 6,
+          padding: 2,
+          cursor: 'pointer',
+          color: data.color,
+        }}
+        title="Voir la fiche"
+      >
+        <Info style={{ width: 11, height: 11 }} />
+      </button>
+      <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.15 }}>{data.label}</div>
+      <div style={{ fontSize: 10, color: '#555', marginTop: 1 }}>
+        {data.count} tech{data.count > 1 ? 's' : ''}
+      </div>
+    </motion.div>
+  )
+}
+
+function TechniqueNode({ data }) {
+  // Terminale = soumission -> cercle plein avec icone
+  if (data.isTerminal) {
+    return (
+      <div
+        onClick={(e) => {
+          e.stopPropagation()
+          data.onInfo(data.id)
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontFamily: 'Outfit, system-ui, sans-serif',
+        }}
+      >
+        <HiddenHandles />
+        <div
+          style={{
+            background: data.color,
+            border: `2px solid ${data.colorDeep || data.color}`,
+            borderRadius: '50%',
+            width: 36,
+            height: 36,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            flexShrink: 0,
+          }}
+        >
+          <CheckCircle style={{ width: 16, height: 16, color: 'white' }} />
+        </div>
+        <span
+          style={{
+            fontWeight: 700,
+            fontSize: 11,
+            color: '#1A1A1A',
+            background: 'rgba(255,255,255,0.85)',
+            padding: '2px 6px',
+            borderRadius: 6,
+            maxWidth: 110,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {data.label}
+        </span>
+      </div>
+    )
+  }
+  // Transition -> pilule allongee
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation()
+        data.onInfo(data.id)
+      }}
+      style={{
+        background: '#F8F7F4',
+        border: `1.5px solid ${data.color}`,
+        color: '#1A1A1A',
+        borderRadius: 16,
+        padding: '5px 12px',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontSize: 12,
+        minWidth: 100,
+        maxWidth: 160,
+        textAlign: 'center',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+        cursor: 'pointer',
+      }}
+    >
+      <HiddenHandles />
+      <span style={{ marginRight: 4, opacity: 0.7 }}>{actionTypeIcon(data.action_type)}</span>
+      {data.label}
+    </div>
+  )
+}
+
+function LinkNode({ data }) {
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation()
+        data.onNavigate(data.targetPositionId)
+      }}
+      style={{
+        background: 'white',
+        border: `1.5px dashed ${data.color}`,
+        color: data.color,
+        borderRadius: 14,
+        padding: '4px 10px',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+      }}
+    >
+      <HiddenHandles />
+      <ArrowRight style={{ width: 11, height: 11 }} />
+      voir {data.label}
+    </div>
+  )
+}
+
+const nodeTypes = {
+  center: CenterNode,
+  category: CategoryNode,
+  position: PositionNode,
+  technique: TechniqueNode,
+  link: LinkNode,
+}
+
+// =====================================================================
+// Construction des nodes / edges depuis les donnees
+// =====================================================================
+
+function buildFlow({
+  categories,
+  getPositionsByCategory,
+  getTechniquesByPosition,
+  getTechniqueTarget,
+  expanded,
+  pulsedPositionId,
+  callbacks,
+}) {
+  const nodes = []
+  const edges = []
+
+  // Centre
+  nodes.push({
+    id: CENTER_ID,
+    type: 'center',
+    position: { x: 0, y: 0 },
+    data: { onToggle: callbacks.onToggle },
+    draggable: false,
+    selectable: false,
+  })
+
+  if (!expanded.has(CENTER_ID)) return { nodes, edges }
+
+  // Categories
+  categories.forEach((cat, idx) => {
+    const slot = CATEGORY_SLOTS[idx % CATEGORY_SLOTS.length]
+    const catPos = polar(0, 0, slot.angle, slot.distance)
+    const catId = `cat:${cat.id}`
+    const catColor = cat.color_hex || '#666'
+    nodes.push({
+      id: catId,
+      type: 'category',
+      position: catPos,
+      data: {
+        id: catId,
+        label: cat.name,
+        color: catColor,
+        count: getPositionsByCategory(cat.id).length,
+        onToggle: callbacks.onToggle,
+        onInfo: () => callbacks.onCategoryInfo(cat),
+      },
+      draggable: false,
+    })
+    edges.push({
+      id: `e:${CENTER_ID}-${catId}`,
+      source: CENTER_ID,
+      target: catId,
+      type: 'smoothstep',
+      style: { stroke: catColor, strokeWidth: 2.5 },
+    })
+
+    if (!expanded.has(catId)) return
+
+    // Positions de la categorie en eventail
+    const positions = getPositionsByCategory(cat.id)
+    const posAngles = fanAngles(slot.angle, positions.length, POSITION_FAN_ARC)
+    positions.forEach((p, pi) => {
+      const a = posAngles[pi]
+      const ppos = polar(catPos.x, catPos.y, a, POSITION_DISTANCE)
+      const posId = `pos:${p.id}`
+      nodes.push({
+        id: posId,
+        type: 'position',
+        position: ppos,
+        data: {
+          id: posId,
+          rawPositionId: p.id,
+          label: p.name,
+          color: catColor,
+          count: getTechniquesByPosition(p.id).length,
+          pulsed: pulsedPositionId === p.id,
+          onToggle: callbacks.onToggle,
+          onInfo: () => callbacks.onPositionInfo(p),
+        },
+        draggable: false,
+      })
+      edges.push({
+        id: `e:${catId}-${posId}`,
+        source: catId,
+        target: posId,
+        type: 'smoothstep',
+        style: { stroke: catColor, strokeWidth: 2 },
+      })
+
+      if (!expanded.has(posId)) return
+
+      // Techniques
+      const techs = getTechniquesByPosition(p.id)
+      const techAngles = fanAngles(a, techs.length, TECH_FAN_ARC)
+      techs.forEach((t, ti) => {
+        const ta = techAngles[ti]
+        const tpos = polar(ppos.x, ppos.y, ta, TECH_DISTANCE)
+        const techId = `tech:${t.id}`
+        const target = getTechniqueTarget(t.id)
+        nodes.push({
+          id: techId,
+          type: 'technique',
+          position: tpos,
+          data: {
+            id: techId,
+            rawTechniqueId: t.id,
+            label: t.name,
+            action_type: t.action_type,
+            color: catColor,
+            colorDeep: cat.color_deep_hex,
+            isTerminal: target.isTerminal,
+            onInfo: () => callbacks.onTechniqueInfo(t),
+          },
+          draggable: false,
+        })
+        edges.push({
+          id: `e:${posId}-${techId}`,
+          source: posId,
+          target: techId,
+          type: 'smoothstep',
+          style: { stroke: catColor, strokeWidth: 1.5 },
+        })
+
+        // Mini-noeud "voir [Position]" si transition vers une autre position
+        if (!target.isTerminal && target.toPosition) {
+          const lpos = polar(tpos.x, tpos.y, ta, LINK_DISTANCE)
+          const linkId = `link:${t.id}`
+          nodes.push({
+            id: linkId,
+            type: 'link',
+            position: lpos,
+            data: {
+              label: target.toPosition.name,
+              color: catColor,
+              targetPositionId: target.toPosition.id,
+              onNavigate: callbacks.onNavigate,
+            },
+            draggable: false,
+          })
+          edges.push({
+            id: `e:${techId}-${linkId}`,
+            source: techId,
+            target: linkId,
+            type: 'smoothstep',
+            style: { stroke: catColor, strokeWidth: 1, strokeDasharray: '4 3' },
+          })
+        }
+      })
+    })
+  })
+
+  return { nodes, edges }
+}
+
+// =====================================================================
+// Modals
+// =====================================================================
 
 function PositionImage({ slug, className = '' }) {
   const [errored, setErrored] = useState(false)
@@ -56,32 +537,17 @@ function PositionImage({ slug, className = '' }) {
   )
 }
 
-// =====================================================================
-// Position detail modal
-// =====================================================================
-
 function PositionDetailModal({ position, category, techniques, onClose, onOpenTechnique }) {
   const color = category?.color_hex || '#6b7280'
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
-      onClick={onClose}
-    >
-      <div
-        className="bg-dojo-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90dvh] overflow-y-auto border border-dojo-border"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-dojo-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90dvh] overflow-y-auto border border-dojo-border" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-dojo-surface border-b border-dojo-border px-4 py-3 flex items-center justify-between z-10">
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
-              {category?.name}
-            </div>
+            <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>{category?.name}</div>
             <h2 className="text-lg font-semibold truncate">{position.name}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-text"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-text">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -89,29 +555,19 @@ function PositionDetailModal({ position, category, techniques, onClose, onOpenTe
           <div className="aspect-[4/3] rounded-xl border border-dojo-border overflow-hidden">
             <PositionImage slug={position.slug} className="w-full h-full" />
           </div>
-          {position.description && (
-            <p className="text-sm text-dojo-text leading-relaxed">{position.description}</p>
-          )}
+          {position.description && <p className="text-sm text-dojo-text leading-relaxed">{position.description}</p>}
           <div>
-            <h3 className="text-sm font-medium text-dojo-muted mb-2">
-              Techniques rattachees ({techniques.length})
-            </h3>
+            <h3 className="text-sm font-medium text-dojo-muted mb-2">Techniques rattachees ({techniques.length})</h3>
             <div className="space-y-1">
               {techniques.length === 0 ? (
                 <p className="text-xs text-dojo-muted italic">Aucune technique pour le moment.</p>
-              ) : (
-                techniques.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => onOpenTechnique(t)}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-dojo-card border border-dojo-border hover:bg-dojo-bg flex items-center gap-2"
-                  >
-                    <span className="text-sm">{actionTypeIcon(t.action_type)}</span>
-                    <span className="text-sm font-medium text-dojo-text flex-1">{t.name}</span>
-                    <span className="text-[10px] uppercase text-dojo-muted">{t.action_type}</span>
-                  </button>
-                ))
-              )}
+              ) : techniques.map((t) => (
+                <button key={t.id} onClick={() => onOpenTechnique(t)} className="w-full text-left px-3 py-2 rounded-lg bg-dojo-card border border-dojo-border hover:bg-dojo-bg flex items-center gap-2">
+                  <span className="text-sm">{actionTypeIcon(t.action_type)}</span>
+                  <span className="text-sm font-medium text-dojo-text flex-1">{t.name}</span>
+                  <span className="text-[10px] uppercase text-dojo-muted">{t.action_type}</span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -120,124 +576,93 @@ function PositionDetailModal({ position, category, techniques, onClose, onOpenTe
   )
 }
 
-// =====================================================================
-// Complete graph view (validation des transitions NULL)
-// =====================================================================
+function CategoryDetailModal({ category, positions, onClose, onOpenPosition }) {
+  const color = category.color_hex
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-dojo-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90dvh] overflow-y-auto border border-dojo-border" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-dojo-surface border-b border-dojo-border px-4 py-3 flex items-center justify-between z-10">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-wide" style={{ color }}>Categorie</div>
+            <h2 className="text-lg font-semibold">{category.name}</h2>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-text">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-4 space-y-2">
+          {positions.map((p) => (
+            <button key={p.id} onClick={() => onOpenPosition(p)} className="w-full text-left px-3 py-2 rounded-lg bg-dojo-card border-2 hover:bg-dojo-bg" style={{ borderColor: color }}>
+              <div className="text-sm font-bold text-dojo-text">{p.name}</div>
+              {p.description && <div className="text-[11px] text-dojo-muted line-clamp-2 mt-0.5">{p.description}</div>}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function CompleteGraphView({ rows, positions, onUpdate, onClose }) {
-  // Etat local : { [transitionId]: { toPositionId, isTerminal } }
   const [drafts, setDrafts] = useState({})
-
   function setDraft(trId, patch) {
     setDrafts((prev) => ({ ...prev, [trId]: { ...(prev[trId] || {}), ...patch } }))
   }
-
   async function handleSave(row) {
     const draft = drafts[row.transition.id] || {}
-    if (draft.isTerminal) {
-      await onUpdate({ techniqueId: row.technique.id, isTerminal: true })
-    } else if (draft.toPositionId) {
-      await onUpdate({
-        techniqueId: row.technique.id,
-        toPositionId: draft.toPositionId,
-        isTerminal: false,
-      })
-    }
-    setDrafts((prev) => {
-      const next = { ...prev }
-      delete next[row.transition.id]
-      return next
-    })
+    if (draft.isTerminal) await onUpdate({ techniqueId: row.technique.id, isTerminal: true })
+    else if (draft.toPositionId) await onUpdate({ techniqueId: row.technique.id, toPositionId: draft.toPositionId, isTerminal: false })
+    setDrafts((prev) => { const n = { ...prev }; delete n[row.transition.id]; return n })
   }
-
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
-      onClick={onClose}
-    >
-      <div
-        className="bg-dojo-surface w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl max-h-[90dvh] overflow-y-auto border border-dojo-border"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-dojo-surface w-full sm:max-w-2xl sm:rounded-2xl rounded-t-2xl max-h-[90dvh] overflow-y-auto border border-dojo-border" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 bg-dojo-surface border-b border-dojo-border px-4 py-3 flex items-center justify-between z-10">
           <div>
             <h2 className="text-lg font-semibold text-dojo-text">Completer le graphe</h2>
-            <p className="text-xs text-dojo-muted">
-              {rows.length} technique{rows.length > 1 ? 's' : ''} sans position d&apos;arrivee
-            </p>
+            <p className="text-xs text-dojo-muted">{rows.length} technique{rows.length > 1 ? 's' : ''} sans position d&apos;arrivee</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-text"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-dojo-card rounded-lg transition-colors bg-transparent border-none text-dojo-text">
             <X className="w-5 h-5" />
           </button>
         </div>
         <div className="p-4 space-y-3">
           {rows.length === 0 ? (
-            <div className="text-center py-8 text-sm text-dojo-muted">
-              Toutes les transitions sont definies. Bravo.
-            </div>
-          ) : (
-            rows.map((row) => {
-              const draft = drafts[row.transition.id] || {}
-              const canSave = !!(draft.isTerminal || draft.toPositionId)
-              return (
-                <div
-                  key={row.transition.id}
-                  className="bg-dojo-card border border-dojo-border rounded-xl p-3 space-y-2"
-                >
-                  <div>
-                    <div className="text-sm font-bold text-dojo-text">{row.technique.name}</div>
-                    <div className="text-[11px] text-dojo-muted">
-                      {actionTypeIcon(row.technique.action_type)} {row.technique.action_type} · depuis{' '}
-                      <span className="font-semibold">{row.fromPosition.name}</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
-                    <select
-                      value={draft.toPositionId || ''}
-                      disabled={draft.isTerminal}
-                      onChange={(e) =>
-                        setDraft(row.transition.id, {
-                          toPositionId: e.target.value || null,
-                          isTerminal: false,
-                        })
-                      }
-                      className="bg-dojo-bg border border-dojo-border rounded-lg px-2 py-1.5 text-sm text-dojo-text"
-                    >
-                      <option value="">Position d&apos;arrivee...</option>
-                      {positions.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    <label className="flex items-center gap-1.5 text-xs text-dojo-text">
-                      <input
-                        type="checkbox"
-                        checked={!!draft.isTerminal}
-                        onChange={(e) =>
-                          setDraft(row.transition.id, {
-                            isTerminal: e.target.checked,
-                            toPositionId: e.target.checked ? null : draft.toPositionId,
-                          })
-                        }
-                      />
-                      Terminale
-                    </label>
-                    <button
-                      onClick={() => handleSave(row)}
-                      disabled={!canSave}
-                      className="px-3 py-1.5 rounded-lg bg-dojo-accent text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed border-none"
-                    >
-                      Valider
-                    </button>
+            <div className="text-center py-8 text-sm text-dojo-muted">Toutes les transitions sont definies.</div>
+          ) : rows.map((row) => {
+            const draft = drafts[row.transition.id] || {}
+            const canSave = !!(draft.isTerminal || draft.toPositionId)
+            return (
+              <div key={row.transition.id} className="bg-dojo-card border border-dojo-border rounded-xl p-3 space-y-2">
+                <div>
+                  <div className="text-sm font-bold text-dojo-text">{row.technique.name}</div>
+                  <div className="text-[11px] text-dojo-muted">
+                    {actionTypeIcon(row.technique.action_type)} {row.technique.action_type} · depuis <span className="font-semibold">{row.fromPosition.name}</span>
                   </div>
                 </div>
-              )
-            })
-          )}
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center">
+                  <select
+                    value={draft.toPositionId || ''}
+                    disabled={draft.isTerminal}
+                    onChange={(e) => setDraft(row.transition.id, { toPositionId: e.target.value || null, isTerminal: false })}
+                    className="bg-dojo-bg border border-dojo-border rounded-lg px-2 py-1.5 text-sm text-dojo-text"
+                  >
+                    <option value="">Position d&apos;arrivee...</option>
+                    {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5 text-xs text-dojo-text">
+                    <input type="checkbox" checked={!!draft.isTerminal}
+                      onChange={(e) => setDraft(row.transition.id, { isTerminal: e.target.checked, toPositionId: e.target.checked ? null : draft.toPositionId })} />
+                    Terminale
+                  </label>
+                  <button onClick={() => handleSave(row)} disabled={!canSave}
+                    className="px-3 py-1.5 rounded-lg bg-dojo-accent text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed border-none">
+                    Valider
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -245,27 +670,10 @@ function CompleteGraphView({ rows, positions, onUpdate, onClose }) {
 }
 
 // =====================================================================
-// Tree node (recursif)
+// Composant principal (wrappe par ReactFlowProvider en bas du fichier)
 // =====================================================================
 
-function TreeChevron({ open, color }) {
-  return (
-    <motion.span
-      animate={{ rotate: open ? 90 : 0 }}
-      transition={{ duration: 0.15 }}
-      className="inline-flex items-center justify-center"
-      style={{ color }}
-    >
-      <ChevronRight className="w-4 h-4" />
-    </motion.span>
-  )
-}
-
-// =====================================================================
-// Composant principal
-// =====================================================================
-
-export default function MindMapPage() {
+function MindMapInner() {
   const mind = useMindMap()
   const {
     categories,
@@ -277,50 +685,95 @@ export default function MindMapPage() {
     getNullTransitions,
     positionById,
     categoryById,
-    positionStats,
     updateTransition,
     getImageUrl,
   } = mind
 
-  const [expanded, setExpanded] = useState(() => new Set())
-  const [pulsedId, setPulsedId] = useState(null)
+  const rf = useReactFlow()
+  const [expanded, setExpanded] = useState(() => new Set([CENTER_ID]))
+  const [pulsedPositionId, setPulsedPositionId] = useState(null)
   const [openTechnique, setOpenTechnique] = useState(null)
   const [openPosition, setOpenPosition] = useState(null)
+  const [openCategory, setOpenCategory] = useState(null)
   const [showCompleteGraph, setShowCompleteGraph] = useState(false)
-  const containerRef = useRef(null)
-  const positionRefs = useRef(new Map())
+  const initialFitDone = useRef(false)
 
   const nullRows = useMemo(() => getNullTransitions(), [getNullTransitions])
 
-  const toggle = useCallback((key) => {
+  const onToggle = useCallback((id) => {
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }, [])
 
-  const navigateToPosition = useCallback(
+  const onNavigate = useCallback(
     (positionId) => {
       const pos = positionById(positionId)
       if (!pos) return
-      // Reset puis ouvre le chemin : categorie -> position
-      const next = new Set([catKey(pos.category_id), posKey(pos.id)])
+      // Reduit a center + categorie + position
+      const next = new Set([CENTER_ID, `cat:${pos.category_id}`, `pos:${pos.id}`])
       setExpanded(next)
-      setPulsedId(positionId)
-      // Scroll apres le tick suivant pour que le DOM ait deplie
+      setPulsedPositionId(pos.id)
+      setTimeout(() => setPulsedPositionId(null), 1500)
+      // Centre la vue apres un tick (les nodes doivent etre re-layoutes)
       setTimeout(() => {
-        const el = positionRefs.current.get(positionId)
-        if (el && el.scrollIntoView) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
+        const cat = categoryById(pos.category_id)
+        const slotIdx = categories.findIndex((c) => c.id === pos.category_id)
+        const slot = CATEGORY_SLOTS[slotIdx % CATEGORY_SLOTS.length] || CATEGORY_SLOTS[0]
+        const catPos = polar(0, 0, slot.angle, slot.distance)
+        const catPositions = getPositionsByCategory(pos.category_id)
+        const angles = fanAngles(slot.angle, catPositions.length, POSITION_FAN_ARC)
+        const pi = catPositions.findIndex((p) => p.id === pos.id)
+        const a = angles[pi]
+        const target = polar(catPos.x, catPos.y, a, POSITION_DISTANCE)
+        rf.setCenter(target.x, target.y, { duration: 600, zoom: 1.2 })
       }, 80)
-      // Le pulse dure 1.5s
-      setTimeout(() => setPulsedId(null), 1500)
     },
-    [positionById]
+    [positionById, categoryById, categories, getPositionsByCategory, rf]
   )
+
+  const callbacks = useMemo(
+    () => ({
+      onToggle,
+      onCategoryInfo: (c) => setOpenCategory(c),
+      onPositionInfo: (p) => setOpenPosition(p),
+      onTechniqueInfo: (t) => setOpenTechnique(t),
+      onNavigate,
+    }),
+    [onToggle, onNavigate]
+  )
+
+  const { nodes, edges } = useMemo(
+    () =>
+      buildFlow({
+        categories,
+        getPositionsByCategory,
+        getTechniquesByPosition,
+        getTechniqueTarget,
+        expanded,
+        pulsedPositionId,
+        callbacks,
+      }),
+    [categories, getPositionsByCategory, getTechniquesByPosition, getTechniqueTarget, expanded, pulsedPositionId, callbacks]
+  )
+
+  // Fit initial : centre sur 'Grappling' avec un peu de marge
+  useEffect(() => {
+    if (loading || initialFitDone.current || categories.length === 0) return
+    initialFitDone.current = true
+    setTimeout(() => rf.setCenter(0, 0, { duration: 0, zoom: 0.9 }), 30)
+  }, [loading, categories, rf])
+
+  function onNodeDoubleClick(_, node) {
+    rf.setCenter(node.position.x + 60, node.position.y + 20, { duration: 500, zoom: 1.4 })
+  }
+
+  function fitAll() {
+    rf.fitView({ duration: 600, padding: 0.15 })
+  }
 
   if (loading) {
     return (
@@ -331,99 +784,57 @@ export default function MindMapPage() {
   }
 
   return (
-    <>
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="px-4 py-3 border-b border-dojo-border bg-dojo-surface flex items-center gap-2">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-dojo-text">Mindmap</h1>
-            <p className="text-[11px] text-dojo-muted">
-              {categories.length} categories · {positions.length} positions
-            </p>
-          </div>
-          {nullRows.length > 0 && (
-            <button
-              onClick={() => setShowCompleteGraph(true)}
-              className="px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-700 text-xs font-bold flex items-center gap-1.5"
-            >
-              <Wrench className="w-3.5 h-3.5" />
-              Completer ({nullRows.length})
-            </button>
-          )}
+    <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="px-4 py-3 border-b border-dojo-border bg-dojo-surface flex items-center gap-2 z-10">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-bold text-dojo-text">Mindmap</h1>
+          <p className="text-[11px] text-dojo-muted">
+            {categories.length} categories · {positions.length} positions
+          </p>
         </div>
+        <button
+          onClick={fitAll}
+          className="p-2 rounded-lg bg-dojo-card border border-dojo-border text-dojo-muted"
+          title="Ajuster la vue"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        {nullRows.length > 0 && (
+          <button
+            onClick={() => setShowCompleteGraph(true)}
+            className="px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-700 text-xs font-bold flex items-center gap-1.5"
+          >
+            <Wrench className="w-3.5 h-3.5" />
+            Completer ({nullRows.length})
+          </button>
+        )}
+      </div>
 
-        <div ref={containerRef} className="flex-1 overflow-auto p-4 space-y-3">
-          {categories.map((cat) => {
-            const catOpen = expanded.has(catKey(cat.id))
-            const catPositions = getPositionsByCategory(cat.id)
-            const color = cat.color_hex
-            return (
-              <div
-                key={cat.id}
-                className="bg-dojo-card border-2 rounded-xl overflow-hidden"
-                style={{ borderColor: color }}
-              >
-                <div className="flex items-center gap-2 p-3">
-                  <button
-                    onClick={() => toggle(catKey(cat.id))}
-                    className="flex-1 flex items-center gap-2 bg-transparent border-none text-left p-0"
-                  >
-                    <TreeChevron open={catOpen} color={color} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-base font-bold text-dojo-text">{cat.name}</div>
-                      <div className="text-[10px] text-dojo-muted">
-                        {catPositions.length} positions
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                <AnimatePresence initial={false}>
-                  {catOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ type: 'spring', damping: 22, stiffness: 220 }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <div
-                        className="border-l-2 ml-4 pl-3 py-1 space-y-1.5 mb-2"
-                        style={{ borderColor: color }}
-                      >
-                        {catPositions.length === 0 ? (
-                          <p className="text-xs text-dojo-muted italic px-2">
-                            Aucune position dans cette categorie.
-                          </p>
-                        ) : (
-                          catPositions.map((pos) => (
-                            <PositionNode
-                              key={pos.id}
-                              position={pos}
-                              category={cat}
-                              expanded={expanded}
-                              onToggle={toggle}
-                              onOpenInfo={() => setOpenPosition(pos.id)}
-                              onOpenTechnique={(t) => setOpenTechnique(t)}
-                              onNavigate={navigateToPosition}
-                              getTechniquesByPosition={getTechniquesByPosition}
-                              getTechniqueTarget={getTechniqueTarget}
-                              positionStats={positionStats}
-                              pulsed={pulsedId === pos.id}
-                              registerRef={(el) => {
-                                if (el) positionRefs.current.set(pos.id, el)
-                                else positionRefs.current.delete(pos.id)
-                              }}
-                            />
-                          ))
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )
-          })}
-        </div>
+      <div className="flex-1 relative bg-dojo-bg">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          onNodeDoubleClick={onNodeDoubleClick}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable
+          panOnScroll
+          zoomOnScroll
+          zoomOnPinch
+          panOnDrag
+          minZoom={0.3}
+          maxZoom={2.5}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={24} size={1} color="#e5e5e5" />
+          <Controls
+            showInteractive={false}
+            position="bottom-right"
+            style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+          />
+        </ReactFlow>
       </div>
 
       {openTechnique && (
@@ -436,13 +847,25 @@ export default function MindMapPage() {
 
       {openPosition && (
         <PositionDetailModal
-          position={positionById(openPosition)}
-          category={categoryById(positionById(openPosition)?.category_id)}
-          techniques={getTechniquesByPosition(openPosition)}
+          position={openPosition}
+          category={categoryById(openPosition.category_id)}
+          techniques={getTechniquesByPosition(openPosition.id)}
           onClose={() => setOpenPosition(null)}
           onOpenTechnique={(t) => {
             setOpenPosition(null)
             setOpenTechnique(t)
+          }}
+        />
+      )}
+
+      {openCategory && (
+        <CategoryDetailModal
+          category={openCategory}
+          positions={getPositionsByCategory(openCategory.id)}
+          onClose={() => setOpenCategory(null)}
+          onOpenPosition={(p) => {
+            setOpenCategory(null)
+            setOpenPosition(p)
           }}
         />
       )}
@@ -455,149 +878,14 @@ export default function MindMapPage() {
           onClose={() => setShowCompleteGraph(false)}
         />
       )}
-    </>
-  )
-}
-
-function PositionNode({
-  position,
-  category,
-  expanded,
-  onToggle,
-  onOpenInfo,
-  onOpenTechnique,
-  onNavigate,
-  getTechniquesByPosition,
-  getTechniqueTarget,
-  positionStats,
-  pulsed,
-  registerRef,
-}) {
-  const open = expanded.has(posKey(position.id))
-  const techs = getTechniquesByPosition(position.id)
-  const stats = positionStats(position.id)
-  const color = category.color_hex
-
-  return (
-    <div ref={registerRef}>
-      <motion.div
-        animate={
-          pulsed
-            ? {
-                backgroundColor: [
-                  'rgba(0,0,0,0)',
-                  `${color}33`,
-                  `${color}22`,
-                  'rgba(0,0,0,0)',
-                ],
-              }
-            : { backgroundColor: 'rgba(0,0,0,0)' }
-        }
-        transition={{ duration: 1.5 }}
-        className="rounded-lg"
-      >
-        <div className="flex items-center gap-2 p-2">
-          <button
-            onClick={() => onToggle(posKey(position.id))}
-            className="flex-1 flex items-center gap-2 bg-transparent border-none text-left p-0 min-w-0"
-          >
-            <TreeChevron open={open} color={color} />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-dojo-text leading-tight truncate">
-                {position.name}
-              </div>
-              <div className="text-[10px] text-dojo-muted">
-                {stats.techniquesCount} tech{stats.techniquesCount > 1 ? 's' : ''}
-                {stats.tested > 0 && ` · ${stats.tested} essais`}
-              </div>
-            </div>
-          </button>
-          <button
-            onClick={onOpenInfo}
-            className="p-1.5 rounded-md hover:bg-dojo-bg bg-transparent border-none text-dojo-muted"
-            title="Voir la fiche position"
-          >
-            <Info className="w-4 h-4" />
-          </button>
-        </div>
-      </motion.div>
-
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: 'spring', damping: 22, stiffness: 220 }}
-            style={{ overflow: 'hidden' }}
-          >
-            <div
-              className="border-l-2 ml-4 pl-3 py-1 space-y-1"
-              style={{ borderColor: color }}
-            >
-              {techs.length === 0 ? (
-                <p className="text-xs text-dojo-muted italic px-2">
-                  Aucune technique pour le moment.
-                </p>
-              ) : (
-                techs.map((t) => (
-                  <TechniqueNode
-                    key={t.id}
-                    technique={t}
-                    color={color}
-                    target={getTechniqueTarget(t.id)}
-                    onOpenInfo={() => onOpenTechnique(t)}
-                    onNavigate={onNavigate}
-                  />
-                ))
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
 
-function TechniqueNode({ technique, color, target, onOpenInfo, onNavigate }) {
+export default function MindMapPage() {
   return (
-    <div className="bg-dojo-bg/50 border border-dojo-border rounded-lg p-2">
-      <div className="flex items-center gap-2">
-        <span className="text-xs">{actionTypeIcon(technique.action_type)}</span>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-dojo-text leading-tight truncate">
-            {technique.name}
-          </div>
-        </div>
-        <button
-          onClick={onOpenInfo}
-          className="p-1 rounded-md hover:bg-dojo-card bg-transparent border-none text-dojo-muted"
-          title="Voir la fiche technique"
-        >
-          <Info className="w-3.5 h-3.5" />
-        </button>
-      </div>
-      <div className="ml-5 mt-1">
-        {target.isTerminal ? (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
-            <CheckCircle className="w-3 h-3" />
-            END
-          </span>
-        ) : target.toPosition ? (
-          <button
-            onClick={() => onNavigate(target.toPosition.id)}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-dojo-text hover:underline bg-transparent border-none p-0"
-            style={{ color }}
-          >
-            <ArrowRight className="w-3 h-3" />
-            voir {target.toPosition.name}
-          </button>
-        ) : target.hasTransition ? (
-          <span className="text-[10px] italic text-amber-600">
-            Position d&apos;arrivee a definir
-          </span>
-        ) : null}
-      </div>
-    </div>
+    <ReactFlowProvider>
+      <MindMapInner />
+    </ReactFlowProvider>
   )
 }
