@@ -55,8 +55,8 @@ create policy "Users CRUD own technique transitions"
   );
 
 -- 4. Peuplement initial depuis les techniques existantes ---------------
--- Les positions sont scopees par user (positions.user_id), donc on
--- match per-user en JOIN.
+-- Les positions sont globales (pas de user_id), seules les techniques
+-- sont scopees par user.
 --
 -- Defaults par action_type :
 --   submission       -> is_terminal = true, to = NULL
@@ -74,27 +74,20 @@ select
   case
     when t.action_type = 'submission' then null
     when t.action_type = 'sweep' then (
-      select p.id from public.positions p
-      where p.user_id = t.user_id and p.slug = 'mount_top'
-      limit 1
+      select p.id from public.positions p where p.slug = 'mount_top' limit 1
     )
     when t.action_type in ('pass', 'takedown') then (
-      select p.id from public.positions p
-      where p.user_id = t.user_id and p.slug = 'side_control_top'
-      limit 1
+      select p.id from public.positions p where p.slug = 'side_control_top' limit 1
     )
     when t.action_type = 'escape' then (
-      select p.id from public.positions p
-      where p.user_id = t.user_id and p.slug = 'seated_open_guard'
-      limit 1
+      select p.id from public.positions p where p.slug = 'seated_open_guard' limit 1
     )
     else null
   end as to_position_id,
   (t.action_type = 'submission') as is_terminal
 from public.techniques t
 join public.positions p_from
-  on p_from.user_id = t.user_id
-  and (p_from.slug = t.position or p_from.name = t.position)
+  on (p_from.slug = t.position or p_from.name = t.position)
 where t.action_type not in ('control', 'drill', 'principle')
 on conflict (technique_id) do nothing;
 

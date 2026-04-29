@@ -162,11 +162,7 @@ export function useMindMap() {
       } else {
         const t = techniqueById(techniqueId)
         const fromId = t
-          ? positions.find(
-              (p) =>
-                p.user_id === user?.id &&
-                (p.slug === t.position || p.name === t.position)
-            )?.id
+          ? positions.find((p) => p.slug === t.position || p.name === t.position)?.id
           : null
         if (!fromId) {
           console.error('updateTransition: cannot resolve from_position_id')
