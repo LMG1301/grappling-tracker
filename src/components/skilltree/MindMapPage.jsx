@@ -805,7 +805,7 @@ function MindMapInner() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden relative">
+    <div className="flex-1 flex flex-col relative">
       <div className="px-4 py-3 border-b border-dojo-border bg-dojo-surface flex items-center gap-2 z-10">
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-bold text-dojo-text">Mindmap</h1>
@@ -832,8 +832,12 @@ function MindMapInner() {
       </div>
 
       <div
-        className="flex-1 relative bg-dojo-bg"
-        style={{ minHeight: 'min(60vh, 500px)' }}
+        className="relative bg-dojo-bg"
+        style={{
+          height: 'calc(100dvh - 180px)',
+          minHeight: '420px',
+          width: '100%',
+        }}
       >
         {categories.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
