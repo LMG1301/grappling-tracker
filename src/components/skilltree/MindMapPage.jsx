@@ -27,39 +27,39 @@ import TechniqueDetail from '../TechniqueDetail'
 
 const CENTER_ID = 'center'
 
-// Position relative des 4 categories autour du centre.
-// Indices = sort_order (0..3) : Debout, Au-dessus, En dessous, Scrambles & Other.
-// Angles en degres : 0 = est, 90 = sud, 180 = ouest, -90 = nord.
-const CATEGORY_SLOTS = [
-  { angle: -135, distance: 320 }, // top-left  -> Debout
-  { angle: -45, distance: 320 },  // top-right -> Au-dessus
-  { angle: 135, distance: 320 },  // bot-left  -> En dessous
-  { angle: 45, distance: 320 },   // bot-right -> Scrambles & Other
+// Layout en colonnes verticales par quadrant.
+// Chaque categorie occupe un quadrant ; ses positions sont empilees
+// verticalement sur le cote exterieur de la categorie ; les techniques
+// d'une position sont empilees a l'exterieur de la position.
+//
+// Indices = sort_order (0..3) : Debout, Au-dessus, En dessous, Scrambles.
+// dx : -1 = cote gauche, +1 = cote droit
+// dy : -1 = vers le haut, +1 = vers le bas
+const QUADRANTS = [
+  { dx: -1, dy: -1 }, // top-left  -> Debout
+  { dx: +1, dy: -1 }, // top-right -> Au-dessus
+  { dx: -1, dy: +1 }, // bot-left  -> En dessous
+  { dx: +1, dy: +1 }, // bot-right -> Scrambles & Other
 ]
 
-const POSITION_DISTANCE = 220
-const POSITION_FAN_ARC = 90 // degres
+// Decalages absolus
+const CAT_X = 360
+const CAT_Y = 180
+const POSITION_DX_FROM_CAT = 240 // les positions sont a l'exterieur de la categorie
+const POSITION_GAP_Y = 70 // ecart vertical entre positions
+const POSITION_FIRST_OFFSET = 30 // ecart vertical entre categorie et premiere position
+const TECH_DX_FROM_POS = 230 // les techniques sont a l'exterieur de la position
+const TECH_GAP_Y = 46
+const LINK_DX = 180
 
-const TECH_DISTANCE = 160
-const TECH_FAN_ARC = 70
-
-const LINK_DISTANCE = 100
-
-const deg2rad = (d) => (d * Math.PI) / 180
-
-function polar(cx, cy, angleDeg, distance) {
-  return {
-    x: cx + Math.cos(deg2rad(angleDeg)) * distance,
-    y: cy + Math.sin(deg2rad(angleDeg)) * distance,
-  }
-}
-
-function fanAngles(centerAngle, count, arc) {
-  if (count === 0) return []
-  if (count === 1) return [centerAngle]
-  const start = centerAngle - arc / 2
-  const end = centerAngle + arc / 2
-  return Array.from({ length: count }, (_, i) => start + (i / (count - 1)) * (end - start))
+// Calcule la position du i-eme element d'une pile verticale (orientation dy).
+// dy = +1 -> elements croissent vers le bas
+// dy = -1 -> elements croissent vers le haut
+function stackY(baseY, i, count, gap, dy, firstOffset = 0) {
+  // On centre la pile sur baseY +/- firstOffset
+  const total = (count - 1) * gap
+  const startY = dy === +1 ? baseY + firstOffset : baseY - firstOffset - total
+  return startY + i * gap
 }
 
 function actionTypeIcon(type) {
@@ -388,16 +388,17 @@ function buildFlow({
 
   if (!expanded.has(CENTER_ID)) return { nodes, edges }
 
-  // Categories
+  // Categories : un par quadrant
   categories.forEach((cat, idx) => {
-    const slot = CATEGORY_SLOTS[idx % CATEGORY_SLOTS.length]
-    const catPos = polar(0, 0, slot.angle, slot.distance)
+    const q = QUADRANTS[idx % QUADRANTS.length]
+    const catX = q.dx * CAT_X
+    const catY = q.dy * CAT_Y
     const catId = `cat:${cat.id}`
     const catColor = cat.color_hex || '#666'
     nodes.push({
       id: catId,
       type: 'category',
-      position: catPos,
+      position: { x: catX, y: catY },
       data: {
         id: catId,
         label: cat.name,
@@ -418,17 +419,17 @@ function buildFlow({
 
     if (!expanded.has(catId)) return
 
-    // Positions de la categorie en eventail
+    // Positions empilees verticalement a l'exterieur de la categorie
     const positions = getPositionsByCategory(cat.id)
-    const posAngles = fanAngles(slot.angle, positions.length, POSITION_FAN_ARC)
+    const posBaseX = catX + q.dx * POSITION_DX_FROM_CAT
     positions.forEach((p, pi) => {
-      const a = posAngles[pi]
-      const ppos = polar(catPos.x, catPos.y, a, POSITION_DISTANCE)
+      const posX = posBaseX
+      const posY = stackY(catY, pi, positions.length, POSITION_GAP_Y, q.dy, POSITION_FIRST_OFFSET)
       const posId = `pos:${p.id}`
       nodes.push({
         id: posId,
         type: 'position',
-        position: ppos,
+        position: { x: posX, y: posY },
         data: {
           id: posId,
           rawPositionId: p.id,
@@ -451,18 +452,18 @@ function buildFlow({
 
       if (!expanded.has(posId)) return
 
-      // Techniques
+      // Techniques empilees verticalement a l'exterieur de la position
       const techs = getTechniquesByPosition(p.id)
-      const techAngles = fanAngles(a, techs.length, TECH_FAN_ARC)
+      const techBaseX = posX + q.dx * TECH_DX_FROM_POS
       techs.forEach((t, ti) => {
-        const ta = techAngles[ti]
-        const tpos = polar(ppos.x, ppos.y, ta, TECH_DISTANCE)
+        const tx = techBaseX
+        const ty = stackY(posY, ti, techs.length, TECH_GAP_Y, q.dy, 0)
         const techId = `tech:${t.id}`
         const target = getTechniqueTarget(t.id)
         nodes.push({
           id: techId,
           type: 'technique',
-          position: tpos,
+          position: { x: tx, y: ty },
           data: {
             id: techId,
             rawTechniqueId: t.id,
@@ -485,12 +486,13 @@ function buildFlow({
 
         // Mini-noeud "voir [Position]" si transition vers une autre position
         if (!target.isTerminal && target.toPosition) {
-          const lpos = polar(tpos.x, tpos.y, ta, LINK_DISTANCE)
+          const lx = tx + q.dx * LINK_DX
+          const ly = ty
           const linkId = `link:${t.id}`
           nodes.push({
             id: linkId,
             type: 'link',
-            position: lpos,
+            position: { x: lx, y: ly },
             data: {
               label: target.toPosition.name,
               color: catColor,
@@ -721,14 +723,14 @@ function MindMapInner() {
       setTimeout(() => {
         try {
           const slotIdx = categories.findIndex((c) => c.id === pos.category_id)
-          const slot = CATEGORY_SLOTS[slotIdx % CATEGORY_SLOTS.length] || CATEGORY_SLOTS[0]
-          const catPos = polar(0, 0, slot.angle, slot.distance)
+          const q = QUADRANTS[slotIdx % QUADRANTS.length] || QUADRANTS[0]
+          const catX = q.dx * CAT_X
+          const catY = q.dy * CAT_Y
           const catPositions = getPositionsByCategory(pos.category_id)
-          const angles = fanAngles(slot.angle, catPositions.length, POSITION_FAN_ARC)
-          const pi = catPositions.findIndex((p) => p.id === pos.id)
-          const a = angles[pi] ?? slot.angle
-          const target = polar(catPos.x, catPos.y, a, POSITION_DISTANCE)
-          rf.setCenter(target.x, target.y, { duration: 600, zoom: 1.0 })
+          const pi = Math.max(0, catPositions.findIndex((p) => p.id === pos.id))
+          const posX = catX + q.dx * POSITION_DX_FROM_CAT
+          const posY = stackY(catY, pi, catPositions.length, POSITION_GAP_Y, q.dy, POSITION_FIRST_OFFSET)
+          rf.setCenter(posX, posY, { duration: 600, zoom: 1.0 })
         } catch (err) {
           console.warn('navigate setCenter failed', err)
         }
