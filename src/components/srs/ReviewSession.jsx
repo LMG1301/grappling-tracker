@@ -1,9 +1,11 @@
-import { ArrowLeft } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSrsSession } from '../../hooks/useSrsSession'
 import ProgressDots from './ProgressDots'
 import FlashCard from './FlashCard'
 import SrsSessionSummary from './SessionSummary'
+import TechniqueDetail from '../TechniqueDetail'
 
 export default function ReviewSession({ dueCards, onBack, onFeedback, getImageUrl }) {
   const {
@@ -17,7 +19,10 @@ export default function ReviewSession({ dueCards, onBack, onFeedback, getImageUr
     elapsedSec,
     flip,
     rate,
+    skip,
   } = useSrsSession(dueCards)
+
+  const [openDetail, setOpenDetail] = useState(false)
 
   if (isComplete) {
     return (
@@ -68,12 +73,31 @@ export default function ReviewSession({ dueCards, onBack, onFeedback, getImageUr
                 intervals={intervals}
                 onFlip={flip}
                 onRate={rate}
+                onOpenDetail={() => setOpenDetail(true)}
                 getImageUrl={getImageUrl}
               />
+              {/* Skip button - dispo a tout moment, ne consomme pas de rating */}
+              {totalCards > 1 && (
+                <button
+                  onClick={skip}
+                  className="mt-3 w-full py-2.5 rounded-xl bg-dojo-surface text-dojo-muted text-xs font-semibold hover:bg-dojo-card transition-colors border border-dojo-border flex items-center justify-center gap-2"
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  Plus tard
+                </button>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
       </div>
+
+      {openDetail && currentCard && (
+        <TechniqueDetail
+          technique={currentCard}
+          imageUrl={getImageUrl?.(currentCard.image_path)}
+          onClose={() => setOpenDetail(false)}
+        />
+      )}
     </div>
   )
 }

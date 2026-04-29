@@ -51,6 +51,18 @@ export function useSrsSession(dueCards) {
 
   const flip = useCallback(() => setIsFlipped(true), [])
 
+  // Re-enqueue la carte courante en fin de pile sans modifier ses
+  // colonnes SRS. Pas comptee dans ratings.
+  const skip = useCallback(() => {
+    if (!currentCard) return
+    setCards(prev => {
+      const rest = prev.slice(0, currentIndex).concat(prev.slice(currentIndex + 1))
+      return [...rest, currentCard]
+    })
+    setIsFlipped(false)
+    // currentIndex ne change pas : la carte d'apres prend sa place
+  }, [currentCard, currentIndex])
+
   const rate = useCallback(async (rating) => {
     if (!currentCard) return
 
@@ -127,6 +139,7 @@ export function useSrsSession(dueCards) {
     elapsedSec,
     flip,
     rate,
+    skip,
   }
 }
 

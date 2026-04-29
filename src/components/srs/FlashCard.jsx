@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Info } from 'lucide-react'
 import { ACTION_COLOR_MAP, ACTION_LABEL_MAP } from '../../config/constants'
 import { extractYoutubeId, getYoutubeThumbnail } from '../../lib/srs/youtube'
 import RatingButtons from './RatingButtons'
@@ -14,7 +14,7 @@ function getTechniqueImage(technique, getImageUrl) {
   return null
 }
 
-export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate, getImageUrl }) {
+export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate, onOpenDetail, getImageUrl }) {
   if (!card) return null
 
   const imageUrl = getTechniqueImage(card, getImageUrl)
@@ -22,7 +22,7 @@ export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate, 
 
   return (
     <div className="space-y-3">
-      {/* Badges */}
+      {/* Badges + info */}
       <div className="flex items-center gap-2">
         <span
           className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
@@ -31,7 +31,16 @@ export default function FlashCard({ card, isFlipped, intervals, onFlip, onRate, 
           {ACTION_LABEL_MAP[card.action_type]}
         </span>
         <span className="text-[10px] text-dojo-muted">{card.position}</span>
-        <span className="text-[10px] font-medium text-dojo-text">{card.name}</span>
+        <span className="text-[10px] font-medium text-dojo-text flex-1 truncate">{card.name}</span>
+        {onOpenDetail && (
+          <button
+            onClick={onOpenDetail}
+            className="p-1 rounded-md hover:bg-dojo-card bg-transparent border-none text-dojo-muted shrink-0"
+            title="Voir la fiche complete"
+          >
+            <Info className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Image */}

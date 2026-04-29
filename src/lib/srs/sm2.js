@@ -1,35 +1,46 @@
-// SM-2 algorithm (SuperMemo 2) — same as Anki
-// quality mapping: 1=Again(1), 2=Hard(3), 3=Good(4), 4=Easy(5)
+// SM-2 algorithm (SuperMemo 2 simplifie) - quality 1..4
+// 1 = A revoir   : EF -= 0.20 (min 1.30), reps=0, interval=1
+// 2 = Difficile  : EF -= 0.15 (min 1.30), reps+1, interval=max(2, interval*1.2)
+// 3 = Bien       : EF stable,             reps+1, interval=interval*EF (4 si premiere fois)
+// 4 = Maitrise   : EF += 0.15 (max 2.80), reps+1, interval=interval*EF*1.3 (7 si premiere fois)
 
-const QUALITY_MAP = { 1: 1, 2: 3, 3: 4, 4: 5 }
+const EF_MIN = 1.30
+const EF_MAX = 2.80
 
 export function sm2(card, rating) {
-  const q = QUALITY_MAP[rating] ?? rating
-  let { ease_factor, interval_days, repetitions } = card
+  const r = Number(rating) || 0
+  let ef = card.ease_factor ?? 2.5
+  let interval = card.interval_days ?? 0
+  let reps = card.repetitions ?? 0
+  const wasFirstTime = reps === 0
 
-  if (q < 3) {
-    // Fail: reset
-    repetitions = 0
-    interval_days = 1
-  } else {
-    // Success
-    if (repetitions === 0) interval_days = 1
-    else if (repetitions === 1) interval_days = 3
-    else interval_days = Math.round(interval_days * ease_factor)
-    repetitions++
+  if (r === 1) {
+    ef = Math.max(EF_MIN, ef - 0.20)
+    reps = 0
+    interval = 1
+  } else if (r === 2) {
+    ef = Math.max(EF_MIN, ef - 0.15)
+    reps += 1
+    interval = Math.max(2, Math.round(interval * 1.2))
+  } else if (r === 3) {
+    // ease_factor stable
+    reps += 1
+    interval = wasFirstTime ? 4 : Math.round(interval * ef)
+  } else if (r === 4) {
+    ef = Math.min(EF_MAX, ef + 0.15)
+    reps += 1
+    interval = wasFirstTime ? 7 : Math.round(interval * ef * 1.3)
   }
 
-  // Adjust ease factor
-  ease_factor = ease_factor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
-  if (ease_factor < 1.3) ease_factor = 1.3
+  if (interval < 1) interval = 1
 
   const nextReview = new Date()
-  nextReview.setDate(nextReview.getDate() + interval_days)
+  nextReview.setDate(nextReview.getDate() + interval)
 
   return {
-    ease_factor: Math.round(ease_factor * 100) / 100,
-    interval_days,
-    repetitions,
+    ease_factor: Math.round(ef * 100) / 100,
+    interval_days: interval,
+    repetitions: reps,
     next_review: nextReview.toISOString().split('T')[0],
     last_review: new Date().toISOString().split('T')[0],
   }
