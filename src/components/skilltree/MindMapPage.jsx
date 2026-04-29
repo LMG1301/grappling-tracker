@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -778,6 +778,24 @@ function MindMapInner() {
     }
   }
 
+  // Re-fit auto a chaque changement d'expansion pour eviter que
+  // les nouveaux noeuds apparaissent hors-ecran.
+  const lastExpandedSize = useRef(expanded.size)
+  useEffect(() => {
+    if (loading) return
+    if (expanded.size !== lastExpandedSize.current) {
+      lastExpandedSize.current = expanded.size
+      const t = setTimeout(() => {
+        try {
+          rf.fitView({ padding: 0.2, duration: 400 })
+        } catch {
+          /* ignore */
+        }
+      }, 60)
+      return () => clearTimeout(t)
+    }
+  }, [expanded, loading, rf])
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -792,7 +810,7 @@ function MindMapInner() {
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-bold text-dojo-text">Mindmap</h1>
           <p className="text-[11px] text-dojo-muted">
-            {categories.length} categories · {positions.length} positions
+            {categories.length} cat · {positions.length} pos · {nodes.length} noeuds · {edges.length} liens
           </p>
         </div>
         <button
@@ -813,7 +831,10 @@ function MindMapInner() {
         )}
       </div>
 
-      <div className="flex-1 relative bg-dojo-bg" style={{ minHeight: 0 }}>
+      <div
+        className="flex-1 relative bg-dojo-bg"
+        style={{ minHeight: 'min(60vh, 500px)' }}
+      >
         {categories.length === 0 ? (
           <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
             <div className="max-w-sm space-y-2">
