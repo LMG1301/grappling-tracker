@@ -3,6 +3,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { DEFAULT_POSITIONS } from '../config/constants'
 
+// Les positions sont desormais globales (table partagee, pas de
+// user_id) - cf migration-mindmap.sql et le module Skill Tree/Mindmap.
+// On garde la signature du hook pour ne pas casser les appelants
+// existants (TechniqueForm, Layout, etc.).
+
 export function usePositions() {
   const { user } = useAuth()
   const [customPositions, setCustomPositions] = useState([])
@@ -12,8 +17,7 @@ export function usePositions() {
     const { data, error } = await supabase
       .from('positions')
       .select('*')
-      .eq('user_id', user.id)
-      .order('name')
+      .order('sort_order', { ascending: true })
     if (error) {
       console.error('Error fetching positions:', error)
     } else {
@@ -25,22 +29,16 @@ export function usePositions() {
     fetchPositions()
   }, [fetchPositions])
 
-  const addPosition = useCallback(async (name) => {
-    if (!user) return null
-    const { data, error } = await supabase
-      .from('positions')
-      .insert({ name, user_id: user.id })
-      .select()
-      .single()
-    if (error) throw error
-    setCustomPositions((prev) => [...prev, data])
-    return data
-  }, [user])
+  // Conserve pour compatibilite avec TechniqueForm. Les positions
+  // sont globales : on n'ajoute plus de positions par utilisateur.
+  const addPosition = useCallback(async () => null, [])
 
   const allPositions = [
     ...DEFAULT_POSITIONS,
     ...customPositions.map((p) => p.name),
-  ].sort()
+  ]
+    .filter((name, idx, arr) => arr.indexOf(name) === idx) // dedupe
+    .sort()
 
   return { positions: allPositions, customPositions, addPosition, refresh: fetchPositions }
 }
