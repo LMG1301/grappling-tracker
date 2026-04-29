@@ -190,6 +190,53 @@ export function useMindMap() {
     return data.publicUrl
   }
 
+  // Upload + assignation d'une image custom a une position. Le fichier
+  // est stocke dans le bucket "technique-images" sous le prefixe
+  // "positions/" (les positions sont globales, pas de scope user).
+  async function uploadPositionImage(positionId, file) {
+    if (!user) throw new Error('Non authentifie')
+    if (!file) throw new Error('Fichier manquant')
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase()
+    const path = `positions/${positionId}-${Date.now()}.${ext}`
+    const { error: uploadErr } = await supabase.storage
+      .from('technique-images')
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: file.type || 'image/png',
+      })
+    if (uploadErr) throw uploadErr
+
+    const { error: updateErr } = await supabase
+      .from('positions')
+      .update({ image_path: path })
+      .eq('id', positionId)
+    if (updateErr) throw updateErr
+
+    setPositions((prev) =>
+      prev.map((p) => (p.id === positionId ? { ...p, image_path: path } : p))
+    )
+    return path
+  }
+
+  // Retire l'image custom (revient au fallback statique GrappleMap)
+  async function clearPositionImage(positionId) {
+    if (!user) throw new Error('Non authentifie')
+    const pos = positions.find((p) => p.id === positionId)
+    if (pos?.image_path) {
+      // Best-effort : supprime le fichier du storage
+      await supabase.storage.from('technique-images').remove([pos.image_path]).catch(() => {})
+    }
+    const { error } = await supabase
+      .from('positions')
+      .update({ image_path: null })
+      .eq('id', positionId)
+    if (error) throw error
+    setPositions((prev) =>
+      prev.map((p) => (p.id === positionId ? { ...p, image_path: null } : p))
+    )
+  }
+
   return {
     categories,
     positions,
@@ -208,6 +255,8 @@ export function useMindMap() {
     positionStats,
     // mutations
     updateTransition,
+    uploadPositionImage,
+    clearPositionImage,
     getImageUrl,
     refresh: loadAll,
   }

@@ -17,6 +17,8 @@ import {
   Wrench,
   HelpCircle,
   Maximize2,
+  Upload,
+  Trash2,
 } from 'lucide-react'
 import { useMindMap } from '../../hooks/useMindMap'
 import TechniqueDetail from '../TechniqueDetail'
@@ -520,27 +522,74 @@ function buildFlow({
 // Modals
 // =====================================================================
 
-function PositionImage({ slug, className = '' }) {
-  const [errored, setErrored] = useState(false)
-  if (!slug || errored) {
+function PositionImage({ slug, customUrl, className = '' }) {
+  // 0: custom upload | 1: static GrappleMap PNG | 2: placeholder
+  const [tier, setTier] = useState(customUrl ? 0 : slug ? 1 : 2)
+
+  // Si la prop customUrl change (apres upload), revenir au tier 0
+  // Sinon si elle disparait, revenir au tier 1 (static).
+  // Detecte le changement via useEffect en synchronisant tier sur les props.
+  useEffect(() => {
+    setTier(customUrl ? 0 : slug ? 1 : 2)
+  }, [customUrl, slug])
+
+  if (tier === 2) {
     return (
       <div className={`flex items-center justify-center bg-dojo-bg text-dojo-muted ${className}`}>
         <HelpCircle className="w-6 h-6 opacity-40" />
       </div>
     )
   }
+  const src = tier === 0 ? customUrl : `/images/positions/${slug}.png`
   return (
     <img
-      src={`/images/positions/${slug}.png`}
+      src={src}
       alt=""
-      onError={() => setErrored(true)}
+      onError={() => setTier((t) => t + 1)}
       className={`w-full h-full object-contain ${className}`}
     />
   )
 }
 
-function PositionDetailModal({ position, category, techniques, onClose, onOpenTechnique }) {
+function PositionDetailModal({
+  position,
+  category,
+  techniques,
+  customImageUrl,
+  onClose,
+  onOpenTechnique,
+  onUploadImage,
+  onClearImage,
+}) {
   const color = category?.color_hex || '#6b7280'
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // reset input pour permettre re-upload du meme fichier
+    if (!file) return
+    setUploadError('')
+    setUploading(true)
+    try {
+      await onUploadImage(position.id, file)
+    } catch (err) {
+      setUploadError(err.message || 'Erreur upload')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleClear() {
+    if (!window.confirm('Retirer l\'image custom et revenir a l\'image GrappleMap par defaut ?')) return
+    setUploadError('')
+    try {
+      await onClearImage(position.id)
+    } catch (err) {
+      setUploadError(err.message || 'Erreur suppression')
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="bg-dojo-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90dvh] overflow-y-auto border border-dojo-border" onClick={(e) => e.stopPropagation()}>
@@ -554,9 +603,42 @@ function PositionDetailModal({ position, category, techniques, onClose, onOpenTe
           </button>
         </div>
         <div className="p-4 space-y-4">
-          <div className="aspect-[4/3] rounded-xl border border-dojo-border overflow-hidden">
-            <PositionImage slug={position.slug} className="w-full h-full" />
+          <div className="relative aspect-[4/3] rounded-xl border border-dojo-border overflow-hidden bg-dojo-bg">
+            <PositionImage slug={position.slug} customUrl={customImageUrl} className="w-full h-full" />
+            {uploading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
           </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-dojo-card border border-dojo-border text-xs font-semibold text-dojo-muted cursor-pointer hover:bg-dojo-bg"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              {customImageUrl ? 'Remplacer l\'image' : 'Uploader une image'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFile}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
+            {customImageUrl && (
+              <button
+                onClick={handleClear}
+                disabled={uploading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-transparent border border-dojo-border text-xs font-semibold text-red-500 hover:bg-red-500/5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Retirer l&apos;image custom
+              </button>
+            )}
+          </div>
+          {uploadError && (
+            <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/30 rounded-lg p-2">{uploadError}</p>
+          )}
           {position.description && <p className="text-sm text-dojo-text leading-relaxed">{position.description}</p>}
           <div>
             <h3 className="text-sm font-medium text-dojo-muted mb-2">Techniques rattachees ({techniques.length})</h3>
@@ -688,6 +770,8 @@ function MindMapInner() {
     positionById,
     categoryById,
     updateTransition,
+    uploadPositionImage,
+    clearPositionImage,
     getImageUrl,
   } = mind
 
@@ -891,14 +975,17 @@ function MindMapInner() {
 
       {openPosition && (
         <PositionDetailModal
-          position={openPosition}
+          position={positionById(openPosition.id) || openPosition}
           category={categoryById(openPosition.category_id)}
           techniques={getTechniquesByPosition(openPosition.id)}
+          customImageUrl={getImageUrl(positionById(openPosition.id)?.image_path)}
           onClose={() => setOpenPosition(null)}
           onOpenTechnique={(t) => {
             setOpenPosition(null)
             setOpenTechnique(t)
           }}
+          onUploadImage={uploadPositionImage}
+          onClearImage={clearPositionImage}
         />
       )}
 
