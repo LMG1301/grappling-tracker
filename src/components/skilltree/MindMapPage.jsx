@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -696,7 +696,6 @@ function MindMapInner() {
   const [openPosition, setOpenPosition] = useState(null)
   const [openCategory, setOpenCategory] = useState(null)
   const [showCompleteGraph, setShowCompleteGraph] = useState(false)
-  const initialFitDone = useRef(false)
 
   const nullRows = useMemo(() => getNullTransitions(), [getNullTransitions])
 
@@ -720,19 +719,22 @@ function MindMapInner() {
       setTimeout(() => setPulsedPositionId(null), 1500)
       // Centre la vue apres un tick (les nodes doivent etre re-layoutes)
       setTimeout(() => {
-        const cat = categoryById(pos.category_id)
-        const slotIdx = categories.findIndex((c) => c.id === pos.category_id)
-        const slot = CATEGORY_SLOTS[slotIdx % CATEGORY_SLOTS.length] || CATEGORY_SLOTS[0]
-        const catPos = polar(0, 0, slot.angle, slot.distance)
-        const catPositions = getPositionsByCategory(pos.category_id)
-        const angles = fanAngles(slot.angle, catPositions.length, POSITION_FAN_ARC)
-        const pi = catPositions.findIndex((p) => p.id === pos.id)
-        const a = angles[pi]
-        const target = polar(catPos.x, catPos.y, a, POSITION_DISTANCE)
-        rf.setCenter(target.x, target.y, { duration: 600, zoom: 1.2 })
+        try {
+          const slotIdx = categories.findIndex((c) => c.id === pos.category_id)
+          const slot = CATEGORY_SLOTS[slotIdx % CATEGORY_SLOTS.length] || CATEGORY_SLOTS[0]
+          const catPos = polar(0, 0, slot.angle, slot.distance)
+          const catPositions = getPositionsByCategory(pos.category_id)
+          const angles = fanAngles(slot.angle, catPositions.length, POSITION_FAN_ARC)
+          const pi = catPositions.findIndex((p) => p.id === pos.id)
+          const a = angles[pi] ?? slot.angle
+          const target = polar(catPos.x, catPos.y, a, POSITION_DISTANCE)
+          rf.setCenter(target.x, target.y, { duration: 600, zoom: 1.0 })
+        } catch (err) {
+          console.warn('navigate setCenter failed', err)
+        }
       }, 80)
     },
-    [positionById, categoryById, categories, getPositionsByCategory, rf]
+    [positionById, categories, getPositionsByCategory, rf]
   )
 
   const callbacks = useMemo(
@@ -760,19 +762,20 @@ function MindMapInner() {
     [categories, getPositionsByCategory, getTechniquesByPosition, getTechniqueTarget, expanded, pulsedPositionId, callbacks]
   )
 
-  // Fit initial : centre sur 'Grappling' avec un peu de marge
-  useEffect(() => {
-    if (loading || initialFitDone.current || categories.length === 0) return
-    initialFitDone.current = true
-    setTimeout(() => rf.setCenter(0, 0, { duration: 0, zoom: 0.9 }), 30)
-  }, [loading, categories, rf])
-
   function onNodeDoubleClick(_, node) {
-    rf.setCenter(node.position.x + 60, node.position.y + 20, { duration: 500, zoom: 1.4 })
+    try {
+      rf.setCenter(node.position.x + 60, node.position.y + 20, { duration: 500, zoom: 1.3 })
+    } catch (err) {
+      console.warn('setCenter failed', err)
+    }
   }
 
   function fitAll() {
-    rf.fitView({ duration: 600, padding: 0.15 })
+    try {
+      rf.fitView({ duration: 600, padding: 0.2 })
+    } catch (err) {
+      console.warn('fitView failed', err)
+    }
   }
 
   if (loading) {
@@ -810,31 +813,45 @@ function MindMapInner() {
         )}
       </div>
 
-      <div className="flex-1 relative bg-dojo-bg">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodeDoubleClick={onNodeDoubleClick}
-          nodesDraggable={false}
-          nodesConnectable={false}
-          elementsSelectable
-          panOnScroll
-          zoomOnScroll
-          zoomOnPinch
-          panOnDrag
-          minZoom={0.3}
-          maxZoom={2.5}
-          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background gap={24} size={1} color="#e5e5e5" />
-          <Controls
-            showInteractive={false}
-            position="bottom-right"
-            style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
-          />
-        </ReactFlow>
+      <div className="flex-1 relative bg-dojo-bg" style={{ minHeight: 0 }}>
+        {categories.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+            <div className="max-w-sm space-y-2">
+              <p className="text-sm font-semibold text-dojo-text">Aucune categorie chargee</p>
+              <p className="text-xs text-dojo-muted">
+                Verifie que la migration Skill Tree / Mindmap a ete passee dans Supabase et que les
+                tables <code>position_categories</code> et <code>positions</code> sont peuplees.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodeDoubleClick={onNodeDoubleClick}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            elementsSelectable
+            panOnScroll
+            zoomOnScroll
+            zoomOnPinch
+            panOnDrag
+            minZoom={0.2}
+            maxZoom={2.5}
+            fitView
+            fitViewOptions={{ padding: 0.25, duration: 0 }}
+            proOptions={{ hideAttribution: true }}
+            style={{ width: '100%', height: '100%' }}
+          >
+            <Background gap={24} size={1} color="#e5e5e5" />
+            <Controls
+              showInteractive={false}
+              position="bottom-right"
+              style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
+            />
+          </ReactFlow>
+        )}
       </div>
 
       {openTechnique && (
